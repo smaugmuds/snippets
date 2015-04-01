@@ -1,0 +1,2 @@
+# snippets
+SMAUG Code Snippets
