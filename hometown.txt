@@ -1,0 +1,450 @@
+
+
+	Hi, this is a small snippet to add hometowns to a Rom 2.4
+
+	mud...it's very simple to install.
+
+
+
+	Edit merc.h. At the end of the file add these lines :
+
+
+
+struct	hometown_type
+
+{
+
+	char	*name;
+
+	int	recall;
+
+	int	school;
+
+	int	morgue;
+
+	int	death;
+
+};
+
+
+
+extern	const	struct	hometown_type	hometown_table	[];
+
+int	get_hometown	args( ( char *argument ) );
+
+
+
+	Now, in char_data, add this line :
+
+
+
+///
+
+    sh_int		start_pos;
+
+    sh_int		default_pos;
+
+    sh_int		hometown; /* <--- This one */
+
+};
+
+///
+
+
+
+	Find this block :
+
+
+
+#define CON_READ_IMOTD			13
+
+#define CON_READ_MOTD			14
+
+#define CON_BREAK_CONNECT		15
+
+
+
+	And at the end of that block add this line:
+
+
+
+#define CON_GET_HOMETOWN		16
+
+
+
+	Go to handler.c and at the end of the file add this
+
+	function :
+
+
+
+int get_hometown( char * argument )
+
+{
+
+	int i = 0;
+
+	
+
+	while ( hometown_table[i].name != NULL )
+
+	{
+
+		if (!str_cmp(argument,hometown_table[i].name))
+
+			return i;
+
+		i++;
+
+	}
+
+	
+
+	return -1;
+
+}
+
+
+
+	Now... in tables.c , add this table to the end of the file :
+
+
+
+const	struct	hometown_type	hometown_table [] =
+
+{
+
+/*	{	"name",		recall,	school,	morgue,	death	},	*/
+
+	{	"Midgaard",	3001,	3700,	3036,	3054	},
+
+	{	"New Thalos",	9506,	18600,	3036,	3054	},
+
+	{	NULL,		3001,	3001,	3001,	3001	}
+
+};
+
+
+
+	(Of course you'll need to change the vnums).
+
+
+
+	Edit comm.c . Find this block of code :
+
+
+
+	write_to_buffer( d, "You may be good, neutral, or evil.\n\r",0);
+
+	write_to_buffer( d, "Which alignment (G/N/E)? ",0);
+
+	d->connected = CON_GET_ALIGNMENT;
+
+
+
+	Change it to this :
+
+
+
+	write_to_buffer( d, "Select a Hometown:\n\r", 0 );
+
+	for (i=0;hometown_table[i].name != NULL; ++i)
+
+	{
+
+		sprintf(buf,"[%-15s]\n\r", hometown_table[i].name );
+
+		write_to_buffer( d, buf, 0 );
+
+	}
+
+	write_to_buffer( d, "\n\rWhat's your hometown? ", 0);
+
+	d->connected = CON_GET_HOMETOWN;
+
+	break;
+
+
+
+    case CON_GET_HOMETOWN:
+
+    	if (get_hometown(argument) == -1)
+
+    	{
+
+    		write_to_buffer( d, "\n\rThat's not a valid selection.\n\r",0);
+
+    		write_to_buffer( d, "Valid selections are:\n\r",0);
+
+		for (i=0;hometown_table[i].name != NULL; ++i)
+
+		{
+
+			sprintf(buf,"[%-15s]\n\r", hometown_table[i].name );
+
+			write_to_buffer( d, buf, 0 );
+
+		}
+
+    		write_to_buffer( d, "\n\rWhat's your hometown? ", 0);
+
+    		return;
+
+    	}
+
+    			
+
+	ch->hometown = get_hometown(argument);
+
+	write_to_buffer( d, "You may be good, neutral, or evil.\n\r",0);
+
+	write_to_buffer( d, "Which alignment (G/N/E)? ",0);
+
+	d->connected = CON_GET_ALIGNMENT;
+
+	break;
+
+
+
+	Find this line :
+
+
+
+	    char_to_room( ch, get_room_index( ROOM_VNUM_SCHOOL ) );
+
+
+
+	And change it to this :
+
+
+
+	    char_to_room( ch, get_room_index( hometown_table[ch->hometown].school ) );
+
+
+
+	Now goto save.c and in fwrite_char find this block :
+
+
+
+    fprintf( fp, "Sex  %d\n",	ch->sex			);
+
+    fprintf( fp, "Cla  %d\n",	ch->class		);
+
+
+
+	At the end of that block add this line :
+
+
+
+    fprintf(fp, "Hmtown %d\n", ch->hometown);
+
+
+
+	In load_char_obj find this block :
+
+
+
+    ch->pcdata->pwd			= str_dup( "" );
+
+    ch->pcdata->bamfin			= str_dup( "" );
+
+    ch->pcdata->bamfout			= str_dup( "" );
+
+
+
+	At the end of that block add this line :
+
+
+
+    ch->hometown			= 0;
+
+
+
+	Go to fread_char and find this block :
+
+
+
+	    KEY( "Hitroll",	ch->hitroll,		fread_number( fp ) );
+
+	    KEY( "Hit",		ch->hitroll,		fread_number( fp ) );
+
+
+
+	Add this line (yes, at the end :) :
+
+
+
+	    KEY( "Hmtown",	ch->hometown,		fread_number( fp ) );
+
+
+
+	Now, the final changes ... edit handler.c again, and find
+
+	this block :
+
+
+
+    /* Death room is set in the clan tabe now */
+
+    if ( !fPull )
+
+    {
+
+        char_to_room(ch,get_room_index(clan_table[ch->clan].hall));
+
+	return;
+
+    }
+
+
+
+	Change it to this :
+
+
+
+    /* Death room is set in the clan tabe now */
+
+    if ( !fPull )
+
+    {
+
+	if (ch->clan)
+
+		char_to_room(ch, get_room_index(clan_table[ch->clan].hall));
+
+	else
+
+		char_to_room(ch, get_room_index(hometown_table[ch->hometown].death));
+
+	return;
+
+    }
+
+
+
+	Edit act_move.c and find this line :
+
+
+
+    if ( ( location = get_room_index( ROOM_VNUM_TEMPLE ) ) == NULL )
+
+
+
+	Change it to :
+
+
+
+    if ( ( location = get_room_index( hometown_table[ch->hometown].recall )
+
+) == NULL )
+
+
+
+	Edit fight.c and at the top of make_corpse add this line :
+
+	(if you don't have morgues, or you don't need them, skip the
+
+	rest of the file)
+
+
+
+    ROOM_INDEX_DATA *location;
+
+
+
+    location = get_room_index ( hometown_table[ch->hometown].morgue );
+
+
+
+	At the end of make_corpse find this :
+
+
+
+    obj_to_room( corpse,ch->in_room );
+
+
+
+	Change it to :
+
+
+
+    if ( IS_NPC(ch) )
+
+      {
+
+    obj_to_room( corpse,ch->in_room );
+
+        }
+
+        else
+
+        {   obj_to_room( corpse,location );  }
+
+
+
+
+
+	I think that's all. This worked for me. Hope it helps you.
+
+
+
+        BTW, this will be posted in my homepage at geocities in a few hours,
+
+        with the latest version of Rom 2.4 OLC and Envy2Rom.
+
+        (http://www.geocities.com/SiliconValley/Pines/9618/)
+
+
+
+					Ivan
+
+
+-----
+NOTE: Below are fixes to this snippet.
+-----
+From: cook@InfoAve.net
+Subject: Re: Ivan's HomeTown snippet
+
+    Add this to your do_recall function...
+*************************************************
+    if (ch->pet != NULL)
+      {
+      char_from_room( ch->pet );
+      char_to_room( ch->pet, location );
+      do_look(ch->pet, "auto" );
+      }
+    return;
+}
+
+From: eidsod01@condor.stcloudstate.edu
+Hmm... how about this?
+
+     if (ch->pet != NULL)
+       {
+       char_from_room( ch->pet );
+       char_to_room( ch->pet, ch->in_room ); /* Causes the pet to go to 
+                                              * the right room no matter 
+					      * what 
+				              */
+       do_look(ch->pet, "auto" );
+       }
+     return;
+ }
+
+From: gsa44@cs.teiher.gr
+Guess what!!!!!!
+I found what the problem was!
+I edit the act_obj.c file
+and I add to the void do_buy the following line!
+
+pet->hometown = ch->hometown;
+
+and it works with out puting on act_move.c
+the following:
+
+if (ch->pet != NULL)
+   {
+     char_from_room(ch->pet);
+     char_to_room( ch->pet, location );
+     do_look( ch, "auto" );
+   }

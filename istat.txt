@@ -1,0 +1,85 @@
+Title:	  login information for the masses
+Codebase: Rom 2.4b6 patched
+Author:   Vorlin (kellert@ij.net)
+
+  Ok, what this is basically is a command named 'istat' that allows 
+anyone and everyone to view their stats, current and permanent. It
+also shows a 'Maxed' message if their permanent stat is equal to
+that of their max_trained stat. Reason it's labelled istat is because
+if you label it 'stats' like I did, it'll interfere with 'stat' as
+an immortal.
+
+Files to muck: 
+act_info.c 
+interp.c
+interp.h
+rom.are
+
+Step 1:	Add this to the bottom of act_info.c.
+
+void do_istat(CHAR_DATA *ch, char *argument)
+{
+    char buf[MAX_STRING_LENGTH];
+
+    if (IS_NPC(ch))
+        return;
+
+    sprintf(buf, "Retrieving race information for %s%ss.\n\r",
+        IS_IMMORTAL(ch) ? "immortal " : "", race_table[ch->race].name);
+    send_to_char(buf, ch);
+    sprintf(buf, "Str[%2d/%2d] Max[%2d] %s\n\r",
+        ch->perm_stat[STAT_STR],
+        get_curr_stat(ch, STAT_STR),
+        get_max_train(ch, STAT_STR),
+        ch->perm_stat[STAT_STR] == get_max_train(ch, STAT_STR) ? "Maxed" : "");
+    send_to_char(buf, ch);
+    sprintf(buf, "Int[%2d/%2d] Max[%2d] %s\n\r",
+            ch->perm_stat[STAT_INT],
+            get_curr_stat(ch, STAT_INT),
+            get_max_train(ch, STAT_INT),
+        ch->perm_stat[STAT_INT] == get_max_train(ch, STAT_INT) ? "Maxed" : "");
+    send_to_char(buf, ch);
+    sprintf(buf, "Wis[%2d/%2d] Max[%2d] %s\n\r",
+            ch->perm_stat[STAT_WIS],
+            get_curr_stat(ch, STAT_WIS),
+        get_max_train(ch, STAT_WIS),
+        ch->perm_stat[STAT_WIS] == get_max_train(ch, STAT_WIS) ? "Maxed" : "");
+    send_to_char(buf, ch);
+    sprintf(buf, "Dex[%2d/%2d] Max[%2d] %s\n\r",
+            ch->perm_stat[STAT_DEX],
+            get_curr_stat(ch, STAT_DEX),
+        get_max_train(ch, STAT_DEX),
+        ch->perm_stat[STAT_DEX] == get_max_train(ch, STAT_DEX) ? "Maxed" : "");
+    send_to_char(buf, ch);
+    sprintf(buf, "Con[%2d/%2d] Max[%2d] %s\n\r",
+            ch->perm_stat[STAT_CON],
+            get_curr_stat(ch, STAT_CON),
+        get_max_train(ch, STAT_CON),
+        ch->perm_stat[STAT_CON] == get_max_train(ch, STAT_CON) ? "Maxed" : "");
+    send_to_char(buf, ch);
+    return;
+}
+
+Step 2:	Add this to interp.c somewhere:
+
+    { "istat",          do_istat,       POS_DEAD,        0,  LOG_NEVER,  1 },
+
+Step 3:	Add this to your interp.h somewhere:
+
+    DECLARE_DO_FUN( do_istat );
+
+Step 4: Add this to the bottom of rom.are, or wherever you put help files.
+
+0 ISTAT~
+Usage: `&istat``
+
+  This handy little command will show you your character's stats.
+Permanent, current, and max stats are shown. This is race-specific.
+~
+
+Step 5: Run a 'make' and then reboot. You should be fine.
+
+  I've pretty much given up on getting email for anything I do, so all I ask is that
+you review and rate this, good or bad (reasons for both would be nice). Happy coding...
+
+--Vorlin, kellert@ij.net

@@ -1,0 +1,219 @@
+From: Christian Boynton <ferris@footprints.net>
+
+You probably should stop using startup as a script and delete it.
+Here's how to do it...
+
+1) Make sure to edit the mudcheck.pl file and insert your values at the beginning. 
+
+2) Edit your crontab file, type crontab -e, it's a vi editor.
+
+3) Put the following line as your crontab script:
+
+1,11,21,31,41,51 * * * * /FootPrints/services/mud/src/mudcheck.pl
+
+4) Make sure to change the directory in the above line.
+
+5) Read the message below! :)
+
+---------- Forwarded message ----------
+Date: Sat, 28 Jun 1997 17:47:03 -0700 (PDT)
+From: Jared Proudfoot <jaredp@direct.ca>
+
+
+Heya,
+
+Okay... There is a perl script in /FootPrints/services/mud/ called
+mudcheck.pl.  Every 10 minutes cron automatically runs this script to see
+if the mud is working properly.
+
+It's pretty basic... Take a look at the file when you have a second.  If 
+you move the mud or change to a new mud or whatever, just change the
+values in the script.
+
+If you need to bring the mud offline for an extended period of time,
+comment out the crontab entry.  Otherwise the mud will automatically
+restart in 10 minutes.
+
+Do not use the startup scripts anymore...  You should always use the
+mudcheck.pl script from now on.  Running it from cron is a lot more CPU
+friendly.
+
+Oh, and you'll also notice that this program logs a little differently.
+You now have log names like: 867543424.log and 867543661.log.  That big
+long number is the time that the mud was started, in seconds, from Jan 1,
+1970.  If you want to convert that number to a real date, type this at the
+prompt:
+
+/usr/local/bin/ctime <time_t>
+
+For example:
+
+/usr/local/bin/ctime 867543424
+867543424 is Sat Jun 28 17:17:04 1997
+
+Hope it helps,
+
+Jared Proudfoot 
+
+---------------------------------------------------------------------
+Jared Proudfoot  				jaredp@direct.ca
+Systems Engineer, 
+Canada Internet Direct Inc.			http://www.direct.ca/
+
+	Finger jproudfo@footprints.net for PGP public key.
+---------------------------------------------------------------------
+
+
+
+#!/usr/bin/perl
+#########################################################################
+# mudcheck.pl				Version 1.0			#
+# Created: Jun 28, 1997			Jared Proudfoot			#
+# Last Modified: Jun 28, 1997		jproudfo@footprints.net		#
+#########################################################################
+# README								#
+#									#
+# This is a pretty simple script that checks to see if a mud is running	#
+# properly.  Be sure to change the 'important vars' section.  The best	#
+# idea is to run this script from cron every couple of minutes... That	#
+# way you can be sure that it stays running.				#
+#########################################################################
+# CHANGES AND HISTORY							#
+#									#
+# v 1.0, Jun 28, 1997	Created.  Seems to work fine now.		#
+#########################################################################
+#########################################################################
+# Define the important vars						#
+#									#
+# Define the host and port number where the mud resides.		#
+
+$server		=	"mud.footprints.net";
+$port		=	"9999";
+
+# $string is the string of characters we will look for upon connecting.	#
+# If we connect, but don't see this string, we will assume the mud	#
+# isn't responding (locked up?) and we'll restart it.  The string	#
+# *must* be on the first line after connect.	
+
+# You may enter this as a regexp if you wish.				#
+
+$replyString		=	"^\n";
+
+# How long do we wait before we connect timeout (in seconds)?		#
+
+$timeOut	=	"60";
+
+# What to execute if we need to restart the mud.  Please include the	#
+# FULL path.								#
+
+$exec		=	"/FootPrints/services/mud/src/rom";
+
+# Path where you want the mud logs to be kept.
+
+$logdir		=	"/FootPrints/services/mud/log";
+
+# Path where we should start the mud from.				#
+$startPath	=	"/FootPrints/services/mud/area";
+
+# That's it.  You shouldn't need to change anything after this line.	#
+#########################################################################
+
+# What do we need to use?
+use Socket;
+require 5.003;
+
+
+
+#########################################################################
+# Main									#
+#########################################################################
+
+if (&connect_server == 0) {
+	# If we couldn't connect, try and restart.			#
+	print ("Connection to $server on port $port failed or timed out after $timeOut seconds!\n");
+	$time = (scalar localtime);
+	print ("Attempting to restart the mud on $time...\n");
+	# Restart the mud						#
+	&restart_mud;
+}
+else {
+	# We connected, but is it working properly?			#
+		$readline = (&gl);
+		if ($readline =~ /$replyString/) {
+			# We found what we were looking for, so exit 	#
+			# properly.					#
+			&disconnect_server;
+			exit 1;
+		}
+	# After all those searches, we didn't find anything.  The mud	#
+	# must be locked up.  Lets kill and restart it.			#
+	&disconnect_server;
+	print ("The connection was sucessful, but it doesn't seem to be responding\n");
+	$time = (scalar localtime);
+	print ("Attempting to restart the mud on $time...\n");
+	system("killall $exec");
+	&restart_mud;
+}
+	
+	
+
+
+#########################################################################
+# Subroutines								#
+#########################################################################
+
+
+sub connect_server {
+	# Connect to the server						#
+	my ($iaddr, $paddr, $proto);
+	$iaddr = inet_aton ($server)
+		or die ("ERROR: No host: $server!\n");
+	$paddr = sockaddr_in ($port, $iaddr);
+	$proto = getprotobyname('tcp');
+	socket (SOCK, PF_INET, SOCK_STREAM, $proto)
+		or die ("ERROR: Socket error $!\n");
+	alarm ($timeOut);
+	if (connect (SOCK, $paddr)) {;
+		alarm (0);
+		return 1;
+	}
+	else {
+		return 0;
+	}
+}
+
+sub disconnect_server {
+	# Disconnect from the server					#
+	close (SOCK);
+	return;
+}
+
+sub sl {
+	# Send a line							#
+  	my ($line)=@_;
+  	print SOCK ("$line")
+		or die ("ERROR: Error writing to server: $!\n");
+	select SOCK;
+  	$|=1;
+  	select STDOUT;
+  	$|=1;
+	return;
+}
+	
+sub gl {
+	# Get a line							#
+	my ($buffer, @reply);
+	$buffer=(<SOCK>);
+#	(@reply) = split (/\s/, $buffer);
+#	return (@reply);
+	return ($buffer);
+}
+
+sub restart_mud {
+		# Restart the mud					#
+		$timet = time();
+		chdir $startPath;
+		system ("$exec $port > $logdir/$timet.log 2>&1 &");
+		return;
+}
+

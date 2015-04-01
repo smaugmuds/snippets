@@ -1,0 +1,47 @@
+There are a few issues that frequently emerge and lead to heated 
+discussions.  The most recent flame-fest has prompted me to try
+exposing some of the deeper issues that are seldom mentioned explicitly.
+This is intended to be entertaining and thought provoking, as opposed
+to argumentation.  
+
+My perception of a codebase is as a "living thing", evolving, adapting
+and hopefully surviving.  My personal bias is towards the ultimate 
+survival of Rom or some derivative.
+
+The FAQ format seems appropriate.
+
+Q. What is a FAQ?
+A. A FAQ is a "Frequently Aggravating Question"
+
+Q. Why have the ROM authors put together and continued to support Rom?
+A. Paraphrasing Brian Moore, "To advance the state of the art in Diku/Merc
+   MUDs"
+
+Q. What is most common ostensible motive to release a Rom derivative?
+A. Rom has 4 but races, 4 classes and 60 levels, lacks color, OLC, detached 
+   address to name resolution, and automated quest.  Most derivatives seem
+   geared to add these popular features, to aid new Implementors in getting
+   a leg up on running their mud.
+
+Q. Does addressing the above issues do an iota to advance the state of ANY art?
+A. No, not really.  These features are popular, and add value to a code base, 
+   but their addition could fairly be called mere cosmetics and even a 
+   hindrance to any significant improvement to the Rom code.  Lots of code 
+   appears to have been added to Rom (though at what point in its evolution 
+   I have not bothered to ascertain) which is redundant and probably not done 
+   by a coder in posession of the "larger picture".  The more "crap" that's 
+   added to the Rom code base before ancient demons are exorcised, the taller
+   order it will be some day for someone to clean up, consolidate and make
+   this code generally maintainable.
+
+Q. Why are the Rom authors distressed by the release of code which to the
+   unenlightened eye appears vastly superior to the Rom releases, while few
+   releases even acknowledge, much less successfully address any of the 
+   underlying problems inherent to "classic Rom", dilluting the pool of 
+   coders working on Rom based projects so that the enrichment of the Rom 
+   lineage ceases, much the way a succession of idiot bastard children would 
+   diminish one's bloodline?
+A. I don't have the slightest idea why.
+
+
+Thanks,  Dennis Reichel

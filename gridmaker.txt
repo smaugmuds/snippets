@@ -1,0 +1,155 @@
+/***************************************************************************
+*   GRIDMAKER 1.0                                                          *
+*   MND is copyright 2000-2002 Charles Tillery (Muerte/Ao)                 *
+*   Website: www.mudsanddragons.com Q/A: ao@mudsanddragons.com             *
+*   By using this code, you have agreed to follow the terms of the         *
+*   ROM license nd all prior licenses                                      *
+*   This header is not to be removed from ANY file                         *
+*   Original WorldMaker by Kroudar, Fall97, mlkesl@stthomas.edu            *
+*                                                                          *
+*  This is only the first version it makes a new area called new.are you   *
+*  must manually place the area that you create into the area.lst. It does *
+*  no function checks to see if you're using the vnums you are creating in *
+*  the file nor does it let you name the area. I plan to have those in the *
+*  new version (if i ever release it).                                     *
+***************************************************************************/
+
+-= PUT IN HELP =-
+0 GUILDMAKE~
+
+Syntax: guildmake <vnum> <width> <height>
+
+VNUM: The starting vnum of area to be made.  
+WIDTH: The amount of rooms left to right.
+HEIGHT: The amount of rooms top to bottom.
+
+i.e. guildmake 100 3 3 would create
+
+    XXX
+    XXX
+    XXX
+
+* GridMaker 1.0 by Muerte of MND *
+~ 
+
+-= PUT IN INTERP.H =-
+
+DECLARE_DO_FUN( do_gridmake     ); /* GridMaker 1.0 by Muerte of MND */
+
+-= PUT IN INTERP.C =-
+
+{"gridmake", do_gridmake, POS_DEAD, IM, LOG_NORMAL, 0, 0},      /* GridMaker 1.0 by Muerte of MND */
+
+-= PUT IN ACT_WIZ.C =-
+
+void do_gridmake(CHAR_DATA *ch, char *argument)
+{
+    /* GridMaker 1.0 by Muerte of MND */
+    FILE *fp;
+    char arg1[10], arg2[10], arg3[10];
+    int width, height, vstart, vend,vnum,n,e,s,w,nw,ne,sw,se,line_pos;
+       
+    argument = one_argument(argument, arg1);
+    argument = one_argument(argument, arg2);
+    argument = one_argument(argument, arg3);
+            
+    if ( arg1[0] == '\0' || arg2[0] == '\0' || arg3[0] == '\0')
+    {
+         send_to_char("SYNTAX: worldmake <start vnum> <width> <height>\n\r", ch);
+         return;
+    }
+        
+    width = atoi(arg2);
+    height = atoi(arg3);
+    vstart = atoi(arg1);
+    vend = vstart + (width*height) - 1;
+            
+    if ((fp = fopen("new.are", "w")) == NULL)
+    {
+        send_to_char("WORLDMAKE: fopen", ch);
+        return;
+    }
+                 
+    printf_to_char(ch, "#*********************************#\n");
+    printf_to_char(ch, "# GENERATING %3d BY %3d AREA FILE #\n",width,height);
+    printf_to_char(ch, "#*********************************#\n");
+     
+    fprintf(fp,"#AREADATA\nName MND~\nBuilders None~\nVNUMs %d %d\nCredits MND~\nSecurity 1\nEnd\n", vstart, vend);
+    fprintf(fp,"\n\n\n#MOBILES\n#0\n");
+    fprintf(fp,"\n\n\n#OBJECTS\n#0\n");
+    fprintf(fp,"\n\n\n#ROOMS\n");
+            
+   for ( vnum=vstart; vnum<=vend; vnum++)
+   { /* for every room */
+       n=vnum-width;
+       s=vnum+width;
+       e=vnum+1;
+       w=vnum-1;
+       nw=n-1;
+       ne=n+1;
+       sw=s-1;
+       se=s+1;
+    
+       /*where it is on the line 0 to (width-1)*/
+       line_pos=(vnum-vstart+1)%(width);
+       if (line_pos==0)
+            line_pos=width;
+        
+   /*north border*/
+       if ( (vnum >= vstart) && (vnum < vstart+width) )
+        {
+            n=0; 
+            nw=0;
+            ne=0;
+        }
+   /*south border*/
+       if ( (vnum > vend-width) && (vnum <= vend) )
+        {
+            s=0;
+            sw=0;
+            se=0;
+        }
+   /*east border*/
+       if ( (vnum-vstart+1)%(width)==0 )
+        {
+            e=0; 
+            ne=0;
+            se=0;
+        }
+   /*west border*/
+        if ( (vnum-vstart+1)%(width)==1 )
+        {
+            w=0;
+            nw=0;
+            sw=0;
+        }
+         
+       fprintf(fp,"#%d\nNAME~\nNO DESC\n~\n~\n0 0 0\n",vnum);
+    if (n > 0)
+       fprintf(fp,"D0\n~\n~\n0 0 %d\n",n);
+    if (e > 0)  
+       fprintf(fp,"D1\n~\n~\n0 0 %d\n",e);
+    if (s > 0)   
+       fprintf(fp,"D2\n~\n~\n0 0 %d\n",s);
+    if (w > 0)
+       fprintf(fp,"D3\n~\n~\n0 0 %d\n",w);
+    if (ne > 0)
+       fprintf(fp,"D6\n~\n~\n0 0 %d\n",ne);
+    if (nw > 0)  
+       fprintf(fp,"D7\n~\n~\n0 0 %d\n",nw);
+    if (se > 0)
+       fprintf(fp,"D8\n~\n~\n0 0 %d\n",se);
+    if (sw > 0)
+       fprintf(fp,"D9\n~\n~\n0 0 %d\n",sw);
+       fprintf(fp,"S\n");
+   }
+            
+    fprintf(fp,"#0\n");
+    fprintf(fp,"\n\n\n#SPECIALS\nS\n");
+    fprintf(fp,"\n\n\n#RESETS\nS\n");
+    fprintf(fp,"\n\n\n#SHOPS\n0\n");
+    fprintf(fp,"\n\n\n#$\n");
+    fclose(fp); 
+    send_to_char("Area Completed\n\r", ch);
+    return;      
+}

@@ -1,0 +1,210 @@
+/******************************************************************
+ * This is a new version of score for a RoT 1.4 Codebase.  I had  *
+ * always been pretty disgusted with the jumble of stuff that you *
+ * get with the standard RoT code, so this looks a good amount    *
+ * better.  This score is really designed for a MUD with an auto- *
+ * questor and pretitles, but if you don't have those, you can    *
+ * just take them out.  The pretitle is at the very top, and the  *
+ * quest stuff is at the bottom.  Here is what I get when I check *
+ * my score:                                                      *
+ *****************************************************************/
+/*
+                                          ________________
+ ________________________________________/Lord Firehed
+| You are the Mad Coding Rabbit
+| You are level 110, and are 49 years old.
+| You are a Male Shadow Mage
+| You have 788 practices and 242 training sessions.
+| Carrying 108/1000 items at 2/1000000 pounds.
+| 29313/29313HPs, 27950/27950Mana, 27177/27177Moves.
+| Hitroll: 25456   Damroll: 25469   Saves:  -25145
+ ----------------------------------------------------------
+|    Str: 25(25)    |         -=ARMOR=-
+|    Int: 25(25)    |      Pierce:  -18055
+|    Wis: 25(25)    |      Bash:    -18082
+|    Dex: 25(25)    |      Slash:   -18082
+|    Con: 25(25)    |      Exotic:  -18076
+ ----------------------------------------------------------
+| You have 0 platinum, 16 gold and 99 silver coins.
+| You are satanic.   Alignment: -1000
+| You have 324 quest points.
+| You may quest again anytime!
+| Holy Light: On  Incog 102
+ ----------------------------------------------------------
+*/
+/* Also, I would like to know if you use my score, although I don't
+   require any credit.  You can e-mail me at firehed13@hotmail.com
+   if you have any questions                                       */
+void do_score( CHAR_DATA *ch, char *argument )
+{
+    char buf[MAX_STRING_LENGTH];
+    BUFFER *output;
+    int i;
+
+    output = new_buf();
+    sprintf( buf,
+	"{R                                          ________________{0\n\r");
+	add_buf(output,buf);
+    sprintf( buf,
+	"{R ________________________________________/{x%s{G%s{x\n\r",
+	ch->pcdata->pretitle,
+	ch->name);
+    add_buf(output,buf);
+    sprintf( buf, "{R| {GYou are%s{x\n\r",
+	IS_NPC(ch) ? ", the mobile." : ch->pcdata->title);
+    add_buf(output,buf);
+
+    sprintf( buf,
+	"{R| {xYou are level {B%d{x, and are {B%d{x years old.\n\r",
+	ch->level, get_age(ch) );
+    add_buf(output,buf);
+
+    if ( get_trust( ch ) != ch->level )
+    {
+	sprintf( buf, "{xYou are trusted at level {B%d{x.\n\r",
+	    get_trust( ch ) );
+	add_buf(output,buf);
+    }
+
+    sprintf(buf, "{R| {xYou are a %s {W%s{x {G%s{x\n\r",
+	ch->sex == 0 ? "{cSexless" : ch->sex == 1 ? "{bMale" : "{mFemale",
+	race_table[ch->race].name,
+ 	IS_NPC(ch) ? "mobile" : class_table[ch->class].name);
+    add_buf(output,buf);
+    sprintf( buf,
+	"{R| {xYou have {B%d{x practices and {B%d{x training sessions.\n\r",
+	ch->practice, ch->train);
+    add_buf(output,buf);
+    sprintf( buf,
+	"{R| {xCarrying {G%d{x/{B%d{x items at {G%ld{x/{B%d{x pounds.\n\r",
+	ch->carry_number, can_carry_n(ch),
+	get_carry_weight(ch) / 10, can_carry_w(ch) /10 );
+    add_buf(output,buf);
+    sprintf( buf,
+	"{R| {r%d/{R%dHPs{x, {b%d/{B%dMana{x, {g%d/{G%dMoves{0.\n\r",
+	ch->hit,  ch->max_hit,
+	ch->mana, ch->max_mana,
+	ch->move, ch->max_move);
+    add_buf(output,buf);
+    if ( ch->level >= 15 )
+    {
+    sprintf( buf, "{R| {YHitroll: {W%d   {YDamroll: {W%d   {YSaves:  {W%d{x\n\r",GET_HITROLL(ch),GET_DAMROLL(ch),ch->saving_throw);
+	add_buf(output,buf);
+    }
+    sprintf( buf, "{R ----------------------------------------------------------{x\n\r");
+    add_buf(output,buf);
+    sprintf( buf, "{R|    {wStr: {R%d{M({r%d{M){x    {R|         {D-{w={WARMOR{w={D-{0\n\r",ch->perm_stat[STAT_STR],get_curr_stat(ch,STAT_STR));
+    add_buf(output,buf);
+    sprintf( buf, "{R|    {wInt: {R%d{M({r%d{M){x    {R|      {cPierce:{C  %d{x\n\r",ch->perm_stat[STAT_INT],get_curr_stat(ch,STAT_INT),GET_AC(ch,AC_PIERCE));
+    add_buf(output,buf);
+    sprintf( buf, "{R|    {wWis: {R%d{M({r%d{M){x    {R|      {cBash:  {C  %d{x\n\r",ch->perm_stat[STAT_WIS],get_curr_stat(ch,STAT_WIS),GET_AC(ch,AC_BASH));
+    add_buf(output,buf);
+    sprintf( buf, "{R|    {wDex: {R%d{M({r%d{M){x    {R|      {cSlash: {C  %d{x\n\r",ch->perm_stat[STAT_DEX],get_curr_stat(ch,STAT_DEX),GET_AC(ch,AC_SLASH));
+    add_buf(output,buf);
+    sprintf( buf, "{R|    {wCon: {R%d{M({r%d{M){x    {R|      {cExotic:{C  %d{x\n\r",ch->perm_stat[STAT_CON],get_curr_stat(ch,STAT_CON),GET_AC(ch,AC_EXOTIC));
+    add_buf(output,buf);
+    sprintf( buf, "{R ----------------------------------------------------------{x\n\r");
+    add_buf(output,buf);
+    sprintf( buf,"{R| {xYou have {W%ld{x platinum, {Y%ld{x gold and {w%ld{x silver coins.\n\r",
+	ch->platinum, ch->gold, ch->silver);
+    add_buf(output,buf);
+    
+    if (!IS_NPC(ch) && ch->level == LEVEL_HERO)
+    {
+	sprintf( buf,"{R| {xYou have scored {C%ld exp{x.\n\r",ch->exp);
+	add_buf(output,buf);
+    } else if (!IS_NPC(ch) && ch->level < LEVEL_HERO) {
+	sprintf( buf,"{R| {xYou have scored {C%ld exp{x. You need {C%ld exp{x to level.\n\r",
+	    ch->exp, ((ch->level + 1) * exp_per_level(ch,ch->pcdata->points) - ch->exp));
+	add_buf(output,buf);
+    }
+
+    if (ch->wimpy)
+    {
+	sprintf( buf, "{R| {xWimpy set to %d hit points.\n\r", ch->wimpy );
+	add_buf(output,buf);
+    }
+ 
+
+    sprintf(buf, "{R| {xYou are ");
+    add_buf(output,buf);
+         if ( ch->alignment >  900 ) sprintf(buf, "{Wangelic{x.");
+    else if ( ch->alignment >  700 ) sprintf(buf, "{Wsaintly{x.");
+    else if ( ch->alignment >  350 ) sprintf(buf, "{wgood{x.");
+    else if ( ch->alignment >  100 ) sprintf(buf, "kind.");
+    else if ( ch->alignment > -100 ) sprintf(buf, "neutral.");
+    else if ( ch->alignment > -350 ) sprintf(buf, "mean.");
+    else if ( ch->alignment > -700 ) sprintf(buf, "{revil{x.");
+    else if ( ch->alignment > -900 ) sprintf(buf, "{Rdemonic{x.");
+    else                             sprintf(buf, "{Rsatanic{x.");
+
+    add_buf(output,buf);
+
+    if ( ch->level >= 10 )
+    {
+	sprintf( buf, "   {xAlignment: {B%d{x\n\r", ch->alignment );
+	add_buf(output,buf);
+    }
+
+
+    if (ch->qps)
+    {
+	if (ch->qps == 1)
+	    sprintf( buf, "{R| {xYou have {M%d{x quest point.\n\r", ch->qps );
+	else
+	    sprintf( buf, "{R| {xYou have {M%d{x quest points.\n\r", ch->qps );
+	add_buf(output,buf);
+    }
+    if (ch->nextquest)
+    {	if (ch->nextquest == 1)
+	    sprintf(buf, "{R| {GYou can quest again in less than one minute!{x\n\r");
+	else
+	    sprintf(buf, "{R| {GYou can quest again in {Y%d{W minutes.{x\n\r",ch->nextquest);
+    }
+    else
+	sprintf(buf, "{R| {GYou may quest again anytime!{x\n\r");
+    add_buf(output,buf);
+
+    /* RT wizinvis and holy light */
+    if ( IS_IMMORTAL(ch))
+    {
+      sprintf(buf,"{R| {WHoly Light: {x");
+      add_buf(output,buf);
+      if (IS_SET(ch->act,PLR_HOLYLIGHT))
+        sprintf(buf,"{YOn{x");
+      else
+        sprintf(buf,"{YOff{x");
+
+      add_buf(output,buf);
+ 
+      if (ch->invis_level)
+      {
+        sprintf( buf, "{W  Wizi {Y%d{x",ch->invis_level);
+	add_buf(output,buf);
+      }
+
+      if (ch->incog_level)
+      {
+	sprintf(buf,"{W  Incog {Y%d{x",ch->incog_level);
+	add_buf(output,buf);
+      }
+      sprintf(buf,"\n\r");
+      add_buf(output,buf);
+    }
+
+
+    if (ch->invited)
+    {
+        sprintf( buf, "{R| {BYou have been invited to join clan {x[{%s%s{x]\n\r",
+            clan_table[ch->invited].pkill ? "B" : "M",
+            clan_table[ch->invited].who_name);
+	add_buf(output,buf);
+    }
+    sprintf( buf, "{R ----------------------------------------------------------{x\n\r");
+    add_buf(output,buf);
+    page_to_char( buf_string(output), ch ); 
+    free_buf(output); 
+
+    if (IS_SET(ch->comm,COMM_SHOW_AFFECTS))
+	do_affects(ch,"");
+}

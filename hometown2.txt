@@ -1,0 +1,41 @@
+From: Whiplash <whiplash@tft.nacs.net>
+
+define a new field in merc.h
+ under pc_race_type I added a new int for a "hometown"
+ie:
+
+int     hometown; 
+
+then update your pc_race entries in const.c
+from the normal:
+
+{ 
+  "Human", "Hum", 0, { 100, 100, 100, 100 },
+ { 13, 13, 13, 13, 13 },   {18, 18, 18, 18, 18 }, SIZE_MEDIUM
+}
+
+to:
+
+ {
+ "Human", "Hum", 0, { 100, 100, 100, 100 },
+  { 13, 13, 13, 13, 13 },  {18, 18, 18, 18, 18 }, SIZE_MEDIUM, 3005
+ }                                                             ^- recall vnum
+ 
+then in do_recall() just point out the room vnum normally defined with
+ROOM_VNUM_TEMPLE to something like pc_race_table[ch->race].hometown
+
+That'll send them to specific rooms based on race, if you wanna do it based
+on alignment, or something else, what i did was add a bit to pc_data in
+merc.h and then define it in nanny() while the player is creating, 
+specifically during the "What is your alignment (G/N/E): " section.
+I don't know if NPC's are checked to disable the recall command, but 
+thats how we have it, otherwise the new pcdata integer will read squat on
+a mob and you get a fancy core file :)
+Remember to add support for the pc_data entry if you do it that way, in 
+fread_char() and fwrite_char() so it read and writes the new info.
+
+---
+whiplash@tft.nacs.net  |  'I'm your source of self-destruction..'
+  Whiplash @ SOH       |           -Master of puppets, Metallica
+
+

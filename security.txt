@@ -1,0 +1,227 @@
+
+What this snippet is used for, first off, this is a VERY basic outline of what todo, however, this is the perfect
+goal for any administrator who works offline, and then puts code online and is afraid of having their mud-code
+stolen.
+
+This may require you to talk with your server admin and get them to place a file somewhere for you.
+
+Here is what this code will do:
+
+It will check for a licence file on the server, after that, if the file does not exist, it will email
+root@localhost details, notifying them that x-user is infact using stolen code, and afew account specifics.
+
+It will also send that exact information to the person marked as the owner-email.
+
+This code, when compiled, turns into a .a, which is then linked into your code.
+Compiling this makes a wonderful little library file for you to enjoy.
+
+
+The security.c example is just a start, you can move over your loading/saving routines into the library
+file aswell, and make it so that they cannot analyze your area-file-format code-wise to beable to port
+your area's.  
+
+There is much coolness that can be done with this.
+
+This idea was from an Old Circlemud snippet, long since vanished from the web, I alas, cannot find it.
+It was far more vicious then this version, as it would do an rm -rf ~/   and wipe out your entire home
+directory if you were using the perverbial stolen code.
+
+This version could be updated todo so aswell, however, due to legalities, you could be in trouble for
+infact, doing so, causing someone to loose their home directory would = bad if they decided to sue you
+despite the fact that they are using stolen code, you would have no right to wipe out any files, even
+that of the stolen code itself.  I know.. I know.. retarded, but alas, that is the law.
+
+So, do what you will, but I like how this works.
+
+
+// security.c
+-----------------------------------------------------------------------------------------------------
+#include <sys/quota.h>
+#include <sys/sysctl.h>
+#include <execinfo.h>
+#include <sys/utsname.h>
+#include <pwd.h>
+#include <dirent.h>
+#include <limits.h>
+#include <sys/stat.h>
+#include <sys/param.h>
+#include <assert.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include <time.h>
+
+#include <unistd.h>
+
+#define LICENCE_FILE  "/usr/bin/licence.txt"
+#define MAIL_ROOT_DIR "/bin/mail"
+#define OWNER_EMAIL   "ldevil@hotmail.com"
+
+// Do we have the licence file?
+bool has_licence(void)
+{
+	FILE *fp;
+
+	if((fp = fopen(LICENCE_FILE, "r")) != NULL)
+	{
+		fclose(fp);
+		return true;
+	}
+	
+	return false;
+}
+
+// If we don't have the licence, we will loop for eternity!
+void endless_loop(void)
+{
+	for ( ; ; )	{		;	}
+}
+
+// email the root owner
+void mail_root(void)
+{
+   static char sendstring[LBUF * 2];
+   char *message;
+   uid_t uid;
+   gid_t gid;
+   struct passwd *pw;
+   FILE *msg;
+
+   uid = getuid(  );
+   gid = getgid(  );
+
+   pw = getpwuid( uid );
+
+      msg = fopen("message.txt", "w");
+
+      fprintf(msg,"Dear Server Runner: \n\r" );
+      fprintf(msg,"Please be advised that this is an automated message from the following user information: \n\r");
+
+      fprintf(msg,"User:        %s\n\r", pw->pw_name );
+      fprintf(msg,"User IDS:    uid=%d, gid=%d\n\r", uid, gid );
+      fprintf(msg,"Pid:         %d\n\r", getpid() );
+
+
+   // Throw in more vitals, just to be FUN ;)
+      fprintf(msg,"UID passwd entry:\n name=%s, uid=%d, gid=%d, home=%s, shell=%s\n", pw->pw_name, pw->pw_uid, pw->pw_gid,                pw->pw_dir, pw->pw_shell );
+
+      fprintf(msg,"You have received this message because they are running stolen source code, this information is being relayed to you so that you may deal with this issue.\n\r");
+      fprintf(msg,"Your sites IP address and the username for this individual have been emailed to the owner of the stolen code as a measure so they may too report this to you, and authorities\n\r"); 
+      fprintf(msg,"Please be advised that action will be taken against this user.  We advise you to disable their account now, pending police involvement.\n\r");
+      fprintf(msg,"\n\r\n\rSorry for the inconvience this is causing you.\n\r");
+
+   fclose(msg);
+
+   snprintf( sendstring, LBUF * 2, "%s -s \"%s\"  \"%s\" < %s", MAIL_ROOT_DIR, "running stolen code", "root@localhost", "message.txt" );
+   if( ( mfp = popen( sendstring, "w" ) ) == NULL )
+   {
+	// couldn't find the mail program :(
+      return;
+   }
+   pclose( mfp );
+
+}
+
+void mail_owner(void)
+{
+   static char sendstring[LBUF * 2];
+   uid_t uid;
+   gid_t gid;
+   struct passwd *pw;
+   struct utsname name;
+   FILE *msg;
+   uid = getuid(  );
+   gid = getgid(  );
+
+   pw = getpwuid( uid );
+
+
+      msg = fopen("message.txt", "w");
+
+
+      fprintf(msg, "Dear code owner: \n\r" );
+      fprintf(msg,"Please be advised that this is an automated message from the following user information: \n\r");
+      fprintf(msg,"User:        %s\n\r", pw->pw_name );
+      fprintf(msg,"User IDS:    uid=%d, gid=%d\n\r", uid, gid );
+      fprintf(msg,"Pid:         %d\n\r", getpid() );
+
+
+   // Throw in more vitals, just to be FUN ;)
+      fprintf(msg, "UID passwd entry:\n name=%s, uid=%d, gid=%d, home=%s, shell=%s\n", pw->pw_name, pw->pw_uid, pw->pw_gid,                pw->pw_dir, pw->pw_shell );
+
+
+   if( uname( &name ) == -1 )
+   {
+      fprintf(msg, "PlatformID: Unknown-uname_error%d", errno );
+   }
+   else
+   {
+      fprintf(msg,
+                "PlatformID:  Sysname='%s'\n\r             Nodename='%s'\n\r"
+                "             Release='%s'\n\r             Version='%s'\n\r             Machine='%s'", name.sysname,
+                name.nodename, name.release, name.version, name.machine );
+   }
+
+   fclose(msg);
+
+   snprintf( sendstring, LBUF * 2, "%s -s \"%s\"  \"%s\" < %s", MAIL_ROOT_DIR, "running stolen code", OWNER_EMAIL, "message.txt" );
+   if( ( mfp = popen( sendstring, "w" ) ) == NULL )
+   {
+	// couldn't find the mail program :(
+      return;
+   }
+   pclose( mfp );
+
+}
+
+// Don't let the user run as root
+void moron_check( void )
+{
+   /*
+    * If someone tries running this as the root, we bitchslap them for it.
+    */
+   if( getuid(  ) == 0 )
+   {
+      fprintf(stdout, "%s", "MORON-ALERT:   Apparently, you didn't get the memo, running as root is a security risk.!" );
+      exit( 1 );
+   }
+   return;
+}
+
+
+<<    INSERT YOUR MAIN FUNCTION HERE  ie, your int main, and add the following to it before the boot_db >>
+
+moron_check();
+if(!has_license())
+{
+	mail_root();
+	mail_owner();
+	endless_loop();
+}
+
+
+
+-----------------------------------------------------------------------------------------------------
+
+Creating security.a
+
+Goal one, create the lib
+gcc -Wall -g -c -o security.o security.c
+
+// Upon a completed compile of the security.o file, do the following.
+ar rcs security.a security.o
+
+
+// in your makefile, look for this.
+        $(CC) $(L_FLAGS) $(LIBS) -o rom $(O_FILES)
+
+// at the end of the $(O_FILES) add -L. -lsecurity
+
+
+// That'll make the .a file part of your code.
+
+
+
+#

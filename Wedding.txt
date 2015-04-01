@@ -1,0 +1,157 @@
+/*
+ * This is a pretty easy one. It's based on the wedding snippet by ..
+ * Belar<rls1@ra.msstate.edu>. I changed a little bit. In the original one
+ * it asked you to set an affect flag, but this doesn't need the flag.
+ *
+ * Add this file to Makefile
+ *
+ * In mud.h pc_data stuff add ...
+ * char *		spouse;
+ *
+ * In save.c in the fwrite_char function, under ..
+ * fprintf( fp, "Armor        %d\n",   ch->armor               );
+ * add ...
+ * if ( ch->pcdata->spouse )
+ * fprintf( fp, "Spouse %s~\n", ch->pcdata->spouse );
+ *
+ * In the fread_char function under ...
+ * KEY( "Susceptible", ch->susceptible,        fread_number( fp ) );
+ * add ...
+ * KEY( "Spouse",      ch->pcdata->spouse,     fread_string( fp ) );
+ *
+ * In act_info.c in the do_who find the line that looks like ...
+ *       sprintf( buf, "%*s%-15s %s%s%s%s%s%s%s%s%s.%s%s%s%s\n\r",
+ * and add one more %s in there somewhere, then add ...
+ * (wch->pcdata->spouse) ? "&W[&RWED&W]" : "",
+ *
+ * That should be about it. If you have any questions, comments, or suggestions
+ * please send them to tdison@swetland.net.
+ * LrdElder - necro.mfn.org port 9000
+ *          
+ */
+
+#include <sys/types.h>
+#include <ctype.h>
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
+#include "mud.h"
+
+void do_marry (CHAR_DATA * ch, char *argument)
+{
+  char buf[MAX_STRING_LENGTH];
+  char arg1[MAX_INPUT_LENGTH];
+  char arg2[MAX_INPUT_LENGTH];
+  CHAR_DATA *vict1;
+  CHAR_DATA *vict2;
+  OBJ_INDEX_DATA *obj_index;
+  OBJ_DATA *ring;
+  OBJ_DATA *band;
+
+  argument = one_argument (argument, arg1);
+  argument = one_argument (argument, arg2);
+
+  if (arg1[0] == '\0' || arg2[0] == '\0')
+    {
+      send_to_char ("Syntax:  marry <person 1> <person 2>\n\r", ch);
+      return;
+    }
+
+  if ((vict1 = get_char_world (ch, arg1)) == NULL)
+    {
+      sprintf (buf, "%s is not connected.\n\r", capitalize (arg1));
+      send_to_char (buf, ch);
+      return;
+    }
+
+  if ((vict2 = get_char_world (ch, arg2)) == NULL)
+    {
+      sprintf (buf, "%s is not connected.\n\r", capitalize (arg2));
+      send_to_char (buf, ch);
+      return;
+    }
+
+  if (IS_NPC (vict1) || IS_NPC (vict2))
+    {
+      send_to_char ("You cannot marry a player to a mob, silly!\n\r", ch);
+      return;
+    }
+
+  if (vict1 == vict2)
+    {
+      send_to_char ("You cannot do that.\n\r", ch);
+      return;
+    }
+
+  if (vict1->pcdata->spouse)
+    {
+      sprintf (buf, "%s is already married to %s!\n\r", vict1->name, vict1->pcdata->spouse);
+      send_to_char (buf, ch);
+      return;
+    }
+
+  if (vict2->pcdata->spouse)
+    {
+      sprintf (buf, "%s is already married to %s!\n\r", vict2->name, vict2->pcdata->spouse);
+      send_to_char (buf, ch);
+      return;
+    }
+
+  vict1->pcdata->spouse = vict2->name;
+  vict2->pcdata->spouse = vict1->name;
+
+  if (((obj_index = get_obj_index (OBJ_VNUM_DIAMOND_RING)) != NULL)
+      && ((ring = create_object (obj_index, 25)) != NULL))
+    obj_to_char (ring, ch);
+
+  if (((obj_index = get_obj_index (OBJ_VNUM_WEDDING_BAND)) != NULL)
+      && ((band = create_object (obj_index, 25)) != NULL))
+    obj_to_char (band, ch);
+
+  sprintf (buf, "%s and %s are now married.", vict1->name, vict2->name);
+  echo_to_all (AT_IMMORT, buf, ECHOTAR_ALL);
+}
+
+void do_home (CHAR_DATA * ch, char *argument)
+{
+  char buf[MAX_STRING_LENGTH];
+  CHAR_DATA *victim;
+
+  if (!IS_AWAKE (ch))
+    {
+      send_to_char ("In your dreams or what?\n\r", ch);
+      return;
+    }
+
+  if (ch->fighting != NULL)
+    {
+      send_to_char ("Not while you are fighting.\n\r", ch);
+      return;
+    }
+
+  if (IS_SET (ch->in_room->room_flags, ROOM_NO_RECALL))
+    {
+      send_to_char ("You failed.\n\r", ch);
+      return;
+    }
+
+  if (!ch->pcdata->spouse)
+    {
+      send_to_char ("But you are not married!\n\r", ch);
+      return;
+    }
+
+  if ((victim = get_char_world (ch, ch->pcdata->spouse)) == NULL)
+    {
+      sprintf (buf, "%s is not connected.\n\r", ch->pcdata->spouse);
+      send_to_char (buf, ch);
+      return;
+    }
+
+  act (AT_RED, "$n steps into a rose-colored gate and disappears.", ch, NULL, NULL, TO_ROOM);
+  char_from_room (ch);
+  char_to_room (ch, victim->in_room);
+
+  act (AT_RED, "$n steps into the room from a rose-colored gate.", ch, NULL, NULL, TO_ROOM);
+  do_look (ch, "auto");
+}

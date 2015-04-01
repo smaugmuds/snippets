@@ -1,0 +1,2574 @@
+/*sexact system.*/
+The sexact system is a basic hack of KaViR's xsocial system from godwars.
+We've expanded upon the system, dropped the system to data-file, and added
+a olc editor.  This is very fun todo.  Many hours of work went into expanding
+this system.  So here it is, for everyone.
+
+I hope you all like it.  My mud is an adult mud, and people requested i add in sex
+so i did.  if you don't like this system.  Sorry, if you do.  Great.
+
+We are located at sandstorm.kicks-ass.org port 6969  Come in, check us out.
+
+Drop me a line on there.  I'm Darien.  The owner/coder of sandstorm.
+
+Hope you enjoy.
+
+
+I didn't write any help-files on how this works.  But it primarily works
+like the social editor from erwin, since it is derived from that mainly.
+
+
+this system has been bug-tested, and works on stock rom muds.
+
+if i missed anything, Let me know, and i'll release an update for it.
+
+To let me know, connect to my mud and drop me a note.
+
+
+Onto the code.
+In merc.h add this to your typedef's
+typedef struct  xsocial_type            XSOCIAL_DATA;
+
+Add this under your PLR's
+#define TIED_UP			 (B)
+#define GAGGED			 (C)
+#define BLINDFOLDED		 (D)
+#define EXTRA_DONE		 (E)
+#define EXTRA_EXP		 (F)
+#define EXTRA_PREGNANT		 (G)
+#define EXTRA_LABOUR		 (H)
+#define EXTRA_BORN		 (I)
+#define EXTRA_POLICY		 (M)
+
+in char_data add this
+    long                extra;
+    
+
+In pc_data add these, genes isn't currently used, but will be in my pregnancy code release.
+    CHAR_DATA     *     partner;
+    char *              cparents;
+    char *              conception;
+    char *              parents;
+    sh_int              stage[3];		// Mud sex, how far you are along
+    sh_int              genes[10];		// character pregnancy
+
+
+Now down, under your social_type add this.
+
+/*
+ * Lets thank KaViR for x-Socials :)
+ */
+struct xsocial_type
+{
+  char *name;
+  char *char_no_arg;
+  char *others_no_arg;
+  char *char_found;
+  char *others_found;
+  char *vict_found;
+  char *char_auto;
+  char *others_auto;
+  sh_int gender;
+  sh_int stage;
+  sh_int position;
+  sh_int self;
+  sh_int other;
+  sh_int extra;
+  bool   chance;
+};
+
+then down just alittle bit more add this.
+extern          struct  xsocial_type  * xsocial_table;
+
+Under IS_SET add this.
+#define IS_EXTRA(ch, sn)     (IS_SET((ch)->extra, (sn)))
+
+in your proto-types section, add the following.
+
+/* olc_xsocial.c */
+void load_xsocial (FILE * fp, struct xsocial_type *social);
+void load_xsocial_table ();
+void save_xsocial (const struct xsocial_type *s, FILE * fp);
+void save_xsocial_table ();
+void save_xsocials_to_table();
+int xsocial_lookup (const char *name);
+XSOCIAL_DATA *get_xsocial_data (char *name);
+extern int maxXSocial
+
+In db.c
+Okay, now drop down to the boot_db function
+and somewhere after the loading of the music file
+add this.
+
+        log_string(LOG_GAME,"Loading xsocial table");
+        load_xsocial_table();
+        
+In interp.c/.h add declarations to
+do_xsocials
+and
+do_xsedit
+and
+do_consent
+
+in interp.c
+add this to the local functions area, despite the fact that its not local.
+extern bool check_xsocial args ((CHAR_DATA * ch, char *command,	 char *argument));
+
+Before your 'Huh' message, you need to add this to the checks, right under check_social
+            && !check_xsocial (ch, command, argument)
+
+In save.c add this to fwrite_char
+        fprintf (fp, "Conceptions %s~\n", ch->pcdata->conception);
+        fprintf (fp, "Parents %s~\n", ch->pcdata->parents);
+        fprintf (fp, "Cparents %s~\n", ch->pcdata->cparents);
+        fprintf (fp, "Extra  %s\n", print_flags (ch->extra));
+        
+in fread_char add these to your case C
+	    KEYS("Conceptions", ch->pcdata->conception, fread_string (fp));
+            KEYS("Cparents", ch->pcdata->cparents, fread_string (fp));        
+	in case E add this
+	    KEY ("Extra", ch->extra, fread_flag (fp));
+	in case P add this
+	    KEYS( "Parents",    ch->pcdata->parents,    fread_string( fp ) );
+
+In Update.c we have the fun :)
+
+In the local-functions area, add this.
+void    fuck_update     args( ( CHAR_DATA *ch ) );
+
+Further down in update_char add this under update_pos
+          fuck_update(ch);
+
+After the char_update add this
+void fuck_update (CHAR_DATA *ch)
+{
+      if (!IS_NPC (ch))
+	{
+	if (ch->pcdata->stage[0] > 0 || ch->pcdata->stage[2] > 0)
+	{
+		CHAR_DATA *vch;
+		if (ch->pcdata->stage[1] > 0 && ch->pcdata->stage[2] >= 225)
+		{
+			ch->pcdata->stage[2] += 1;
+			if ( ( vch = ch->pcdata->partner ) != NULL 
+			&& !IS_NPC(vch) && vch->pcdata->partner == ch && ((vch->pcdata->stage[2] >= 200 && vch->sex == SEX_FEMALE) 
+			|| (ch->pcdata->stage[2] >= 200 && ch->sex == SEX_FEMALE)))
+			{
+		        if (ch->in_room != vch->in_room)
+          		return;
+
+        if (vch->pcdata->stage[2] >= 225 && ch->pcdata->stage[2] >= 225 && vch->pcdata->stage[2] < 240 && ch->pcdata->stage[2] < 240)
+				{
+					ch->pcdata->stage[2] = 240;
+					vch->pcdata->stage[2] = 240;
+				}
+				if (ch->sex == SEX_MALE && vch->pcdata->stage[2] >= 240)
+				{
+					act("You thrust deeply between $N's warm, damp thighs.",ch,NULL,vch,TO_CHAR);
+					act("$n thrusts deeply between your warm, damp thighs.",ch,NULL,vch,TO_VICT);
+					act("$n thrusts deeply between $N's warm, damp thighs.",ch,NULL,vch,TO_NOTVICT);
+					if (vch->pcdata->stage[2] > ch->pcdata->stage[2])
+						ch->pcdata->stage[2] = vch->pcdata->stage[2];
+				}
+				else if (ch->sex == SEX_FEMALE && vch->pcdata->stage[2] >= 240)
+				{
+					act("You squeeze your legs tightly around $N, moaning loudly.",ch,NULL,vch,TO_CHAR);
+					act("$n squeezes $s legs tightly around you, moaning loudly.",ch,NULL,vch,TO_VICT);
+					act("$n squeezes $s legs tightly around $N, moaning loudly.",ch,NULL,vch,TO_NOTVICT);
+					if (vch->pcdata->stage[2] > ch->pcdata->stage[2])
+						ch->pcdata->stage[2] = vch->pcdata->stage[2];
+				}
+			}
+			if (ch->pcdata->stage[2] >= 250)
+			{
+        if ((vch = ch->pcdata->partner) != NULL && !IS_NPC(vch) && vch->pcdata->partner == ch && ch->in_room == vch->in_room)
+				{
+					vch->pcdata->stage[2] = 250;
+					if (ch->sex == SEX_MALE)
+					{
+						stage_update(ch,vch,2,"xm-thrust");
+						stage_update(vch,ch,2,"xf-squeeze");
+					}
+					else
+					{
+						stage_update(vch,ch,2,"xm-thrust");
+						stage_update(ch,vch,2,"xf-squeeze");
+					}
+											
+					ch->pcdata->stage[0] = 0;
+					vch->pcdata->stage[0] = 0;
+					
+					if (!IS_EXTRA(ch, EXTRA_EXP))
+					{
+						stc("Congratulations on achieving a simultanious orgasm!  Recieve 1000 exp!\n\r",ch);
+						SET_BIT(ch->extra, EXTRA_EXP);
+						gain_exp(ch,1000);
+					}
+					if (!IS_EXTRA(vch, EXTRA_EXP))
+					{
+						stc("Congratulations on achieving a simultanious orgasm!  Recieve 1000 exp!\n\r",vch);
+						SET_BIT(vch->extra, EXTRA_EXP);
+						gain_exp(vch,1000);
+					}
+				}
+			}
+		}
+		else
+		{
+      if (ch->pcdata->stage[0] > 0 && ch->pcdata->stage[2] < 1 && ch->position != POS_RESTING)
+			{
+				if (ch->pcdata->stage[0] > 1)
+					ch->pcdata->stage[0] -= 1;
+				else
+					ch->pcdata->stage[0] = 0;
+			}
+			else if (ch->pcdata->stage[2]>0 && ch->pcdata->stage[0] < 1)
+			{
+				if (ch->pcdata->stage[2] > 10)
+					ch->pcdata->stage[2] -= 10;
+				else
+					ch->pcdata->stage[2] = 0;
+				if (ch->sex == SEX_MALE && ch->pcdata->stage[2] == 0)
+					stc("You feel fully recovered.\n\r",ch);
+			}
+		}
+	}
+	}
+}
+
+
+
+the following is olc_sexacts.c  cut/paste as you deem necessary.
+But please, leave the headers intact.
+/***************************************************************************
+ *  Original Diku Mud copyright (C) 1990, 1991 by Sebastian Hammer,        *
+ *  Michael Seifert, Hans Henrik Starfeldt, Tom Madsen, and Katja Nyboe.   *
+ *                                                                         *
+ *  Merc Diku Mud improvments copyright (C) 1992, 1993 by Michael          *
+ *  Chastain, Michael Quan, and Mitchell Tse.                              *
+ *                                                                         *
+ *  In order to use any part of this Merc Diku Mud, you must comply with   *
+ *  both the original Diku license in 'license.doc' as well the Merc       *
+ *  license in 'license.txt'.  In particular, you may not remove either of *
+ *  these copyright notices.                                               *
+ *                                                                         *
+ *  Much time and thought has gone into this software and you are          *
+ *  benefitting.  We hope that you share your changes too.  What goes      *
+ *  around, comes around.                                                  *
+ ***************************************************************************/
+/******************************************************
+ * ..........   SandStorm:Mages Sanctuary             *
+ *  ........    By David Simmerson                    *
+ * .......      2001-2002(c) David Simmerson          *
+ *  ....        email:ldevil@hotmail.com              *
+ *   ..                                               *
+ *    .           Can you survive the sandstorm?      *
+ ******************************************************/
+/********************************************************************
+ * The Dark forgotten is a ROM Derivative. Rom was made with Merc2.2*
+ * By Russ Taylor.  In order for you to use this code, you must     *
+ * agree to the Licence Merc, Rom, and Diku Licences, Along with the*
+ * TDF License file.                                                *
+ * The Dark Forgotten was written by David Simmerson(aka SoEnSo)    *
+ * Contact him at.  ldevil@hotmail.com for questions or comments    *
+ * about the TDF source.. He may even help you.                     *
+ ********************************************************************/
+/* Online Social Editting Module, 
+ * (c) 1996,97 Erwin S. Andreasen <erwin@andreasen.org>
+ * See the file "License" for important licensing information
+ */
+
+/* This version contains minor modifications to support ROM 2.4b4. */
+
+#if defined(WIN32)
+#include <sys/types.h>
+#include <time.h>
+#else
+#include <sys/types.h>
+#include <sys/time.h>
+#endif
+#include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include "merc.h"
+#include "recycle.h"
+#include "db.h"
+#include "tables.h"
+#include "olc.h"
+
+#define XSOCIAL_FILE "../data/xsocials.dat"
+
+int maxXSocial;
+
+struct xsocial_type *xsocial_table;	/* and social table */
+
+#define XSEDIT( fun )		bool fun( CHAR_DATA *ch, char *argument )
+void
+load_xsocial (FILE * fp, struct xsocial_type *social)
+{
+  social->name = fread_string (fp);
+  social->char_no_arg = fread_string (fp);
+  social->others_no_arg = fread_string (fp);
+  social->char_found = fread_string (fp);
+  social->others_found = fread_string (fp);
+  social->vict_found = fread_string (fp);
+  social->char_auto = fread_string (fp);
+  social->others_auto = fread_string (fp);
+  social->gender = fread_number(fp);
+  social->stage = fread_number(fp);
+  social->position = fread_number(fp);
+  social->self = fread_number(fp);
+  social->other = fread_number(fp);
+  social->extra = fread_number(fp);
+  social->chance = fread_number(fp);
+}
+
+void
+load_xsocial_table ()
+{
+  FILE *fp;
+  int i;
+
+  fp = file_open (XSOCIAL_FILE, "r");
+
+  if (!fp)
+    {
+      bug ("Could not open " XSOCIAL_FILE " for reading.", 0);
+      exit (1);
+    }
+
+  fscanf (fp, "%d\n", &maxXSocial);
+
+  /* IMPORTANT to use malloc so we can realloc later on */
+  xsocial_table = malloc (sizeof (struct xsocial_type) * (maxXSocial + 1));
+
+  for (i = 0; i < maxXSocial; i++)
+    load_xsocial (fp, &xsocial_table[i]);
+
+  /* For backwards compatibility */
+
+  xsocial_table[maxXSocial].name = str_dup ("");	/* empty! */
+  file_close (fp);
+  return;
+}
+
+void
+save_xsocial (const struct xsocial_type *s, FILE * fp)
+{
+  /* get rid of (null) */
+  fprintf (fp, "%s~\n",  s->name ? s->name : "");
+  fprintf (fp, "%s~\n",  s->char_no_arg ? s->char_no_arg : "");
+  fprintf (fp, "%s~\n",  s->others_no_arg ? s->others_no_arg : "");
+  fprintf (fp, "%s~\n",  s->char_found ? s->char_found : "");
+  fprintf (fp, "%s~\n",  s->others_found ? s->others_found : "");
+  fprintf (fp, "%s~\n",  s->vict_found ? s->vict_found : "");
+  fprintf (fp,"%s~\n%s~\n%d %d %d %d %d %d %d\n\n",
+	   s->char_auto ? s->char_auto : "",
+	   s->others_auto ? s->others_auto : "",
+       	   s->gender,	   s->stage,	   s->position,
+	   s->self,	   s->other,	   s->extra,
+	   s->chance);
+
+}
+
+void
+save_xsocial_table ()
+{
+  FILE *fp =NULL;
+  int i;
+
+  fp = file_open (XSOCIAL_FILE, "w");
+
+  if (!fp)
+    {
+      bug ("Could not open " XSOCIAL_FILE " for writing.", 0);
+      return;
+    }
+
+  fprintf (fp, "%d\n", maxXSocial);
+
+  for (i = 0; i < maxXSocial; i++)
+    save_xsocial (&xsocial_table[i], fp);
+
+  file_close (fp);
+}
+
+/*This is for when your making the fresh table from the stuff in the code.*/
+#ifdef SAVEEX
+void save_xsocials_to_table()
+{
+  FILE *fp = NULL;
+  long int i;
+  long int count_xsocials =0;
+  fp = file_open(XSOCIAL_FILE, "w");
+
+  if (!fp)
+    {
+      bug ("Could not open " XSOCIAL_FILE " for writing.", 0);
+      return;
+    }
+
+  logstr(LOG_GAME,"Saving Xsocial File");
+
+  for (i = 0; xsocial_table[i].name != '\0'; i++)
+      count_xsocials++;
+
+  fprintf (fp, "%ld\n", count_xsocials);
+
+  /* get rid of (null) */
+  for (i = 0;  xsocial_table[i].name !='\0'; i++)
+  {
+   fprintf (fp, "%s~\n%s~\n%s~\n%s~\n%s~\n%s~\n%s~\n%s~\n",
+	   xsocial_table[i].name ? xsocial_table[i].name : "",  
+           xsocial_table[i].char_no_arg ? 	   xsocial_table[i].char_no_arg : "",
+	   xsocial_table[i].others_no_arg ? 	   xsocial_table[i].others_no_arg : "",
+	   xsocial_table[i].char_found ? 	   xsocial_table[i].char_found : "",
+	   xsocial_table[i].others_found ? 	   xsocial_table[i].others_found : "",
+	   xsocial_table[i].vict_found ? 	   xsocial_table[i].vict_found : "",
+	   xsocial_table[i].char_auto ? 	   xsocial_table[i].char_auto : "",
+	   xsocial_table[i].others_auto ? 	   xsocial_table[i].others_auto : "");
+   fprintf(fp,"%d %d %d %d %d %d %d\n\r",
+       	   xsocial_table[i].gender,	   xsocial_table[i].stage,	   xsocial_table[i].position,
+	   xsocial_table[i].self,	   xsocial_table[i].other,	   xsocial_table[i].extra,
+	   xsocial_table[i].chance);
+   }
+  file_close (fp);
+  logstr(LOG_GAME,"Done saving xsocial file");
+}
+#endif
+
+/* Find a social based on name */
+int
+xsocial_lookup (const char *name)
+{
+  int i;
+
+  for (i = 0; i < maxXSocial; i++)
+    if (!str_cmp (name, xsocial_table[i].name))
+      return i;
+
+  return -1;
+}
+
+/*
+ * Social editting command
+ */
+
+XSOCIAL_DATA *
+get_xsocial_data (char *name)
+{
+  int i;
+
+  for (i = 0; i < maxXSocial; i++)
+    if (!str_cmp (name, xsocial_table[i].name))
+      return &xsocial_table[i];
+  return NULL;
+}
+
+XSEDIT (xsedit_show)
+{
+  XSOCIAL_DATA *pSocial;
+//    char buf[MSL];
+
+  if (IS_NULLSTR (argument))
+    EDIT_XSOCIAL (ch, pSocial);
+  else
+    pSocial = get_xsocial_data (argument);
+
+  if (pSocial == NULL)
+    {
+      stc ("That xsocial does not exist.\n\r", ch);
+      return FALSE;
+    }
+
+/*    xprintf(buf, "[ %s: %s ]", olc_ed_name (ch), olc_ed_vnum (ch));
+    ptc (ch,"%s\n\r", buf);
+*/
+  ptc (ch, "Name    : %s\n\r"
+		  "(cnoarg): %s\n\r" "(onoarg): %s\n\r"
+		  "(cfound): %s\n\r" "(ofound): %s\n\r"
+		  "(vfound): %s\n\r" "(cself) : %s\n\r"
+		  "(oself) : %s\n\r",
+		  (pSocial->name),
+		  (pSocial->char_no_arg),
+		  (pSocial->others_no_arg),
+		  (pSocial->char_found),
+		  (pSocial->others_found),
+		  (pSocial->vict_found),
+		  (pSocial->char_auto), (pSocial->others_auto));
+   ptc(ch, "Stage   : %d\n\r",pSocial->stage);
+   ptc(ch, "Sex     : %d\n\r",pSocial->gender);
+   ptc(ch, "Position: %d\n\r",pSocial->position);
+   ptc(ch, "Self    : %d\n\r",pSocial->self);
+   ptc(ch, "Other   : %d\n\r",pSocial->other);
+   ptc(ch, "Extra   : %d\n\r",pSocial->extra);
+   ptc(ch, "chance  : %d\n\r",pSocial->chance);
+
+  stc ("\n\r", ch);
+  return TRUE;
+}
+
+XSEDIT (xsedit_delete)
+{
+  int i, j;
+  XSOCIAL_DATA *pSocial;
+  struct xsocial_type *new_table;
+
+  new_table = (struct xsocial_type *) calloc (sizeof (*new_table), maxXSocial);
+
+  if (!new_table)
+    {
+      stc ("Memory allocation failed. Brace for impact...\n\r", ch);
+      return FALSE;
+    }
+
+  if (IS_NULLSTR (argument))
+    EDIT_XSOCIAL (ch, pSocial);
+  else
+    pSocial = get_xsocial_data (argument);
+
+  if (pSocial == NULL)
+    {
+      stc ("No such xsocial exists.\n\r", ch);
+      return FALSE;
+    }
+
+  for (i = 0, j = 0; i < maxXSocial + 1; i++)
+    {
+      if (&xsocial_table[i] != pSocial)
+	{
+	  new_table[j] = xsocial_table[i];
+	  j++;
+	}
+    }
+  free (xsocial_table);
+  xsocial_table = new_table;
+  maxXSocial--;
+  edit_done (ch);
+  stc ("XSocial deleted.\n\r", ch);
+  return TRUE;
+}
+
+XSEDIT (xsedit_create)
+{
+  int iSocial;
+  XSOCIAL_DATA *pSocial;
+  char arg[MIL];
+  struct xsocial_type *new_table;
+
+  argument = one_argument (argument, arg);
+
+  if (IS_NULLSTR (arg))
+    {
+      stc ("Syntax: xsedit create [social]\n\r", ch);
+      return FALSE;
+    }
+  if ((iSocial = xsocial_lookup (arg)) != -1)
+    {
+      stc ("A xsocial with that name already exists.\n\r", ch);
+      return FALSE;
+    }
+  if (strlen(arg) > 14)
+  {
+      stc( "XSedit: Name too long, please chose another name.\n\r",ch);
+      return FALSE;
+  }
+  
+  maxXSocial++;
+  new_table =
+    realloc (xsocial_table, sizeof (struct xsocial_type) * (maxXSocial + 1));
+
+  if (!new_table)
+    {
+      stc ("Memory allocation failed. Brace for impact...\n\r", ch);
+      return FALSE;
+    }
+  xsocial_table = new_table;
+
+  xsocial_table[maxXSocial - 1].name = str_dup (arg);
+
+  xsocial_table[maxXSocial - 1].char_no_arg = str_dup ("");
+  xsocial_table[maxXSocial - 1].others_no_arg = str_dup ("");
+  xsocial_table[maxXSocial - 1].char_found = str_dup ("");
+  xsocial_table[maxXSocial - 1].others_found = str_dup ("");
+  xsocial_table[maxXSocial - 1].vict_found = str_dup ("");
+  xsocial_table[maxXSocial - 1].char_auto = str_dup ("");
+  xsocial_table[maxXSocial - 1].others_auto = str_dup ("");
+  xsocial_table[maxXSocial].name = str_dup ("");
+  xsocial_table[maxXSocial - 1].gender = 0;
+  xsocial_table[maxXSocial - 1].stage = 0;
+  xsocial_table[maxXSocial - 1].position = 0;
+  xsocial_table[maxXSocial - 1].self = 0;
+  xsocial_table[maxXSocial - 1].other = 0;
+  xsocial_table[maxXSocial - 1].extra = 0;
+  xsocial_table[maxXSocial - 1].chance = 0;
+  pSocial = get_xsocial_data (arg);
+  ch->desc->pEdit = (void *) pSocial;
+  stc ("XSocial created.\n\r", ch);
+  return TRUE;
+}
+
+XSEDIT (xsedit_name)
+{
+  XSOCIAL_DATA *pSocial;
+
+  EDIT_XSOCIAL (ch, pSocial);
+
+  if (pSocial == NULL)
+    {
+      stc ("No social to edit.\n\r", ch);
+      return FALSE;
+    }
+
+  if(strlen(argument) > 14)
+  {
+     stc("Name too long, keep it under 14 characters in length.",ch);
+     return FALSE;
+  }
+
+  strcpy (pSocial->name, argument);
+  stc ("Social changed.\n\r", ch);
+//    save_social_table();
+  return TRUE;
+}
+
+XSEDIT (xsedit_cnoarg)
+{
+  XSOCIAL_DATA *pSocial;
+
+  EDIT_XSOCIAL (ch, pSocial);
+
+  if (pSocial == NULL)
+    {
+      stc ("No xsocial to edit.\n\r", ch);
+      return FALSE;
+    }
+
+  replace_string (pSocial->char_no_arg, argument);
+  stc ("xSocial changed.\n\r", ch);
+//    save_social_table();
+  return TRUE;
+}
+
+XSEDIT (xsedit_onoarg)
+{
+  XSOCIAL_DATA *pSocial;
+
+  EDIT_XSOCIAL (ch, pSocial);
+
+  if (pSocial == NULL)
+    {
+      stc ("No xsocial to edit.\n\r", ch);
+      return FALSE;
+    }
+
+  replace_string (pSocial->others_no_arg, argument);
+  stc ("XSocial changed.\n\r", ch);
+  //  save_social_table();
+  return TRUE;
+}
+
+XSEDIT (xsedit_cfound)
+{
+  XSOCIAL_DATA *pSocial;
+
+  EDIT_XSOCIAL (ch, pSocial);
+
+  if (pSocial == NULL)
+    {
+      stc ("No xsocial to edit.\n\r", ch);
+      return FALSE;
+    }
+
+  replace_string (pSocial->char_found, argument);
+  stc ("XSocial changed.\n\r", ch);
+//    save_social_table();
+  return TRUE;
+}
+
+XSEDIT (xsedit_ofound)
+{
+  XSOCIAL_DATA *pSocial;
+
+  EDIT_XSOCIAL (ch, pSocial);
+
+  if (pSocial == NULL)
+    {
+      stc ("No xsocial to edit.\n\r", ch);
+      return FALSE;
+    }
+
+  replace_string (pSocial->others_found, argument);
+  stc ("xSocial changed.\n\r", ch);
+//    save_social_table();
+  return TRUE;
+}
+
+XSEDIT (xsedit_vfound)
+{
+  XSOCIAL_DATA *pSocial;
+
+  EDIT_XSOCIAL (ch, pSocial);
+
+  if (pSocial == NULL)
+    {
+      stc ("No xsocial to edit.\n\r", ch);
+      return FALSE;
+    }
+
+  replace_string (pSocial->vict_found, argument);
+  stc ("XSocial changed.\n\r", ch);
+//    save_social_table();
+  return TRUE;
+}
+
+XSEDIT (xsedit_cself)
+{
+  XSOCIAL_DATA *pSocial;
+
+  EDIT_XSOCIAL (ch, pSocial);
+
+  if (pSocial == NULL)
+    {
+      stc ("No xsocial to edit.\n\r", ch);
+      return FALSE;
+    }
+
+  replace_string (pSocial->char_auto, argument);
+  stc ("XSocial changed.\n\r", ch);
+//    save_social_table();
+  return TRUE;
+}
+
+XSEDIT (xsedit_sex)
+{
+  XSOCIAL_DATA *pSocial;
+  int checkk =0;
+  EDIT_XSOCIAL (ch, pSocial);
+
+  if (pSocial == NULL)
+    {
+      stc ("No xsocial to edit.\n\r", ch);
+      return FALSE;
+    }
+
+  if(argument[0] =='\0')
+  {
+    stc("sex type\n\r",ch);
+    stc("Types:0 - all\n\r1 - male\n\r2 - female\n\r3 - lesbian\n\r4 - gay\n\r",ch);
+    return FALSE;
+  }
+  if(!is_number(argument))
+  {
+    stc("sex type\n\r",ch);
+    stc("Types:0 - all\n\r1 - male\n\r2 - female\n\r3 - lesbian\n\r4 - gay\n\r",ch);
+     return FALSE;
+  }
+
+  checkk = atoi(argument);
+  
+  if(checkk > 4)
+  {
+    stc("Types: 0 - all\n\r1 - male\n\r 2 - female\n\r3 - lesbian\n\r4 - gay\n\r",ch);
+    return FALSE;
+  }
+
+  pSocial->gender = atoi(argument);
+  stc ("XSocial changed.\n\r", ch);
+//    save_social_table();
+  return TRUE;
+}
+
+XSEDIT (xsedit_position)
+{
+  XSOCIAL_DATA *pSocial;
+
+  EDIT_XSOCIAL (ch, pSocial);
+
+  if (pSocial == NULL)
+    {
+      stc ("No xsocial to edit.\n\r", ch);
+      return FALSE;
+    }
+
+  if(argument[0] =='\0')
+  {
+    stc("sex 0-7\n\r",ch);
+    return FALSE;
+  }
+  if(!is_number(argument))
+  {
+    stc("sex 0-7\n\r",ch);
+     return FALSE;
+  }
+
+  pSocial->position = atoi(argument);
+  stc ("XSocial changed.\n\r", ch);
+//    save_social_table();
+  return TRUE;
+}
+
+XSEDIT (xsedit_selfpleasure)
+{
+  XSOCIAL_DATA *pSocial;
+
+  EDIT_XSOCIAL (ch, pSocial);
+
+  if (pSocial == NULL)
+    {
+      stc ("No xsocial to edit.\n\r", ch);
+      return FALSE;
+    }
+
+  if(argument[0] =='\0')
+  {
+    stc("self 1-500\n\r",ch);
+    return FALSE;
+  }
+  if(!is_number(argument))
+  {
+    stc("self 1-500\n\r",ch);
+     return FALSE;
+  }
+
+  pSocial->self = atoi(argument);
+  stc ("XSocial changed.\n\r", ch);
+//    save_social_table();
+  return TRUE;
+}
+
+XSEDIT (xsedit_otherpleasure)
+{
+  XSOCIAL_DATA *pSocial;
+
+  EDIT_XSOCIAL (ch, pSocial);
+
+  if (pSocial == NULL)
+    {
+      stc ("No xsocial to edit.\n\r", ch);
+      return FALSE;
+    }
+
+  if(argument[0] =='\0')
+  {
+    stc("other 1-500\n\r",ch);
+    return FALSE;
+  }
+  if(!is_number(argument))
+  {
+    stc("other 1-500\n\r",ch);
+     return FALSE;
+  }
+
+  pSocial->other = atoi(argument);
+  stc ("XSocial changed.\n\r", ch);
+//    save_social_table();
+  return TRUE;
+}
+
+XSEDIT (xsedit_extra)
+{
+  XSOCIAL_DATA *pSocial;
+
+  EDIT_XSOCIAL (ch, pSocial);
+
+  if (pSocial == NULL)
+    {
+      stc ("No xsocial to edit.\n\r", ch);
+      return FALSE;
+    }
+
+  if(argument[0] =='\0')
+  {
+    stc("extra 1-10\n\r",ch);
+    return FALSE;
+  }
+  if(!is_number(argument))
+  {
+    stc("extra 1-10\n\r",ch);
+     return FALSE;
+  }
+
+  pSocial->extra = atoi(argument);
+  stc ("XSocial changed.\n\r", ch);
+//    save_social_table();
+  return TRUE;
+}
+
+XSEDIT (xsedit_chance)
+{
+  XSOCIAL_DATA *pSocial;
+  int b = 0;
+  EDIT_XSOCIAL (ch, pSocial);
+
+  if (pSocial == NULL)
+    {
+      stc ("No xsocial to edit.\n\r", ch);
+      return FALSE;
+    }
+
+  if(argument[0] =='\0')
+  {
+    stc("chance 0-1\n\r",ch);
+    return FALSE;
+  }
+  if(!is_number(argument))
+  {
+    stc("chance 0-1\n\r",ch);
+     return FALSE;
+  }
+
+  b = atoi(argument);
+
+  if(b >1)
+   {
+    stc("chance 0-1\n\r",ch);
+     return FALSE;
+   }
+  
+
+  pSocial->chance = atoi(argument);
+  stc ("XSocial changed.\n\r", ch);
+//    save_social_table();
+  return TRUE;
+}
+
+XSEDIT (xsedit_stage)
+{
+  XSOCIAL_DATA *pSocial;
+  int b = 0;
+  EDIT_XSOCIAL (ch, pSocial);
+
+  if (pSocial == NULL)
+    {
+      stc ("No xsocial to edit.\n\r", ch);
+      return FALSE;
+    }
+
+  if(argument[0] =='\0')
+  {
+    stc("stage 0-3\n\r",ch);
+    return FALSE;
+  }
+  if(!is_number(argument))
+  {
+    stc("stage 0-3\n\r",ch);
+     return FALSE;
+  }
+
+  b = atoi(argument);
+
+  if(b >3)
+   {
+    stc("stage 0-3\n\r",ch);
+     return FALSE;
+   }
+  
+
+  pSocial->stage = atoi(argument);
+  stc ("XSocial changed.\n\r", ch);
+//    save_social_table();
+  return TRUE;
+}
+
+XSEDIT (xsedit_oself)
+{
+  XSOCIAL_DATA *pSocial;
+
+  EDIT_XSOCIAL (ch, pSocial);
+
+  if (pSocial == NULL)
+    {
+      stc ("No xsocial to edit.\n\r", ch);
+      return FALSE;
+    }
+
+  replace_string (pSocial->others_auto, argument);
+  stc ("XSocial changed.\n\r", ch);
+//    save_social_table();
+  return TRUE;
+}
+
+
+void
+xsedit (CHAR_DATA * ch, char *argument)
+{
+  int cmd = 0;
+  char arg[MIL], command[MIL];
+
+  smash_tilde (argument);
+  strcpy (arg, argument);
+  argument = one_argument (argument, command);
+
+  if (ch->pcdata->security < 5)
+    {
+      stc ("XSEdit: Insufficient security to modify socials.\n\r", ch);
+      edit_done (ch);
+    }
+
+  if (!str_cmp (command, "done"))
+    {
+      save_xsocial_table ();
+      edit_done (ch);
+      return;
+    }
+
+  if (IS_NULLSTR (command))
+    {
+      xsedit_show (ch, argument);
+      return;
+    }
+
+  for (cmd = 0; xsedit_table[cmd].name != NULL; cmd++)
+    {
+      if (!str_prefix (command, xsedit_table[cmd].name))
+	{
+	  (*xsedit_table[cmd].olc_fun) (ch, argument);
+	  return;
+	}
+    }
+  interpret (ch, arg);
+  return;
+}
+
+ACMD (do_xsedit)
+{
+  XSOCIAL_DATA *pSocial;
+  char arg1[MIL];
+
+  argument = one_argument (argument, arg1);
+
+  if (IS_NPC (ch))
+    return;
+
+  if (ch->pcdata->security < 5)
+    {
+      stc ("Insuficient security to edit xsocials.\n\r", ch);
+      return;
+    }
+
+  if (!str_cmp (arg1, "show"))
+    {
+      if (IS_NULLSTR (argument))
+	{
+	  stc ("Syntax: xsedit show [social]\n\r", ch);
+	  return;
+	}
+      xsedit_show (ch, argument);
+      return;
+    }
+  if (!str_cmp (arg1, "create"))
+    {
+      if (IS_NULLSTR (argument))
+	{
+	  stc ("Syntax: xsedit create [social]\n\r", ch);
+	  return;
+	}
+      if (xsedit_create (ch, argument))
+	{
+	  ch->desc->editor = ED_XSOCIAL;
+	  act ("$n has entered the xsocial editor.", ch, NULL, NULL, TO_ROOM);
+	}
+      return;
+    }
+  if (!str_cmp (arg1, "delete"))
+    {
+      if (IS_NULLSTR (argument))
+	{
+	  stc ("Syntax: xsedit delete [social]\n\r", ch);
+	  return;
+	}
+      if (xsedit_delete (ch, argument))
+	{
+	  return;
+	}
+    }
+
+  if ((pSocial = get_xsocial_data (arg1)) != NULL)
+    {
+      ch->desc->pEdit = (void *) pSocial;
+      ch->desc->editor = ED_XSOCIAL;
+      act ("$n has entered the xsocial editor.", ch, NULL, NULL, TO_ROOM);
+      return;
+    }
+  if (pSocial == NULL && !IS_NULLSTR (arg1))
+    {
+      stc ("That xsocial does not exist.\n\r", ch);
+      return;
+    }
+
+  stc ("XSEdit: There is no default social to edit.\n\r", ch);
+  return;
+}
+
+
+/*
+ * The X-social table.
+ * Add new X-socials here.
+ * Alphabetical order is not required.
+ * As far as i know, this is originaly from KaViR of Godwars
+ * i took it from the LOW4 godwars MudBase.. All credits are in
+ * the godwars licence file.  Which is located in the DOC directory
+ * You must adhere to it, before using this code.
+ * From LOW4 Godwars Mud Base
+ */
+
+extern bool check_xsocial args ((CHAR_DATA * ch, char *command,
+				 char *argument));
+void make_preg args ((CHAR_DATA * mother, CHAR_DATA * father));
+void stage_update( CHAR_DATA *ch, CHAR_DATA *victim, int stage,char *argument );
+
+void
+do_xsocials (CHAR_DATA * ch, char *argument)
+{
+  char buf[MSL];
+  BUFFER *output = new_buf();
+  int iSocial;
+  int col;
+
+  col = 0;
+
+  add_buf(output,"{D============================================================================{x\n\r");
+  add_buf(output,"{D                                 ALL                                    {x\n\r");
+  for (iSocial = 0; iSocial < maxXSocial; iSocial++)
+    {
+     if(xsocial_table[iSocial].gender == 0)
+      {
+        xprintf(buf,"%-15s",xsocial_table[iSocial].name);
+        add_buf(output,buf);
+        col++;
+        if(col ==5)
+        {
+          add_buf(output,"\n\r");
+          col=0;
+        } 
+       }
+    }
+ if(col !=0)
+  add_buf(output,"\n\r");
+
+  add_buf(output,"{D                                MALE                                      {x\n\r");
+  col = 0;
+   for (iSocial = 0; iSocial < maxXSocial; iSocial++)
+    {
+    if(xsocial_table[iSocial].gender == 1)
+       {
+        xprintf(buf,"%-15s",xsocial_table[iSocial].name);
+        add_buf(output,buf);
+        col++;
+        if(col == 5)
+        {
+          add_buf(output,"\n\r");
+          col=0;
+        }  
+       }
+     }
+  if(col !=0)
+   add_buf(output,"\n\r");
+
+   add_buf(output,"{D                                FEMALE                                    {x\n\r");
+    col = 0;
+   for(iSocial =0; iSocial < maxXSocial; iSocial++)
+   {
+    if(xsocial_table[iSocial].gender ==2)
+     {
+        xprintf(buf,"%-15s",xsocial_table[iSocial].name);
+        add_buf(output,buf);
+        col++;
+        if(col == 5)
+        {
+          add_buf(output,"\n\r");
+          col = 0;
+        }
+     }
+   }
+  if(col !=0)
+     add_buf(output,"\n\r");
+     add_buf(output,"{D                                LESBIAN                                  {x\n\r");
+     col = 0;
+     for(iSocial = 0; iSocial < maxXSocial; iSocial++)
+     {
+       if(xsocial_table[iSocial].gender ==3)
+       {
+         xprintf(buf,"%-15s",xsocial_table[iSocial].name);
+         add_buf(output,buf);
+         col++;
+         if(col ==5)
+         {
+           add_buf(output,"\n\r");
+           col = 0;
+         }
+       }
+     }
+  if(col !=0)
+     add_buf(output,"\n\r");
+
+     add_buf(output,"{D                                  GAY                                     {x\n\r");
+     col=0;
+     for(iSocial = 0; iSocial < maxXSocial; iSocial++)
+     {
+       if(xsocial_table[iSocial].gender ==4)
+       {
+         xprintf(buf,"%-15s",xsocial_table[iSocial].name);
+         add_buf(output,buf);
+         col++;
+         if(col ==5)
+         {
+           add_buf(output,"\n\r");
+           col=0;
+         }
+       }
+     }
+
+  if (col % 6 != 0)
+    add_buf (output,"\n\r");
+ 
+  add_buf(output,"{D============================================================================{x\n\r");
+  page_to_char(buf_string(output),ch);
+  free_buf(output);  
+  return;
+}
+
+/*End olc_sexact.c*/
+
+
+
+
+
+
+
+/*This is the data-file xsocials.dat  Copy/paste from 133 down. and paste to its own file.*/
+133
+x-earlobe~
+On whom do you wish to do this?~
+~
+You gently tug on $M earlobe with your teeth.~
+$n gently tugs on $N's earlobe with $s teeth.~
+$n gently tugs on your earlobe with $s teeth.~
+Not on yourself!~
+~
+0 0 0 1 1 0 0
+
+x-kneel~
+Drop to your knees before who?~
+~
+You drop to your knees before $M, begging for mercy.~
+$n drops to $s knees before $N, begging for $M mercy.~
+$n drops to $s knees before you, begging for mercy.~
+Nope.~
+~
+0 0 0 7 7 0 0
+
+x-french~
+On whom do you wish to do this?~
+~
+You give $M a deep throbbing kiss, rolling your tongue around $S.~
+$n gives $N a deep throbbing kiss.~
+$n gives you a deep throbbing kiss, rolling $s tongue around yours.~
+Not on yourself!~
+~
+0 0 0 1 1 0 0
+
+x-kissneck~
+On whom do you wish to do this?~
+~
+You slowly and softly kiss and nuzzle $M neck.~
+$n slowly and softly kisses and nuzzles $N's neck.~
+$n slowly and softly kisses and nuzzles your neck.~
+Not on yourself!~
+~
+0 0 0 1 1 0 0
+
+x-wink~
+On whom do you wish to do this?~
+~
+You obviously wink at $M.~
+$n obviously winks at $N for some sexual attention.~
+$n winks at you for some sexual attention.~
+Not on yourself!~
+~
+0 0 0 1 1 0 0
+
+x-wcream~
+On whom do you wish to do this?~
+~
+You spray whipped cream all over $M body, licking it up with your tongue.~
+$n coats $N's body in whipped cream and then licks it up with their tongue.~
+$n covers your body in whipped cream, and you moan as it gets licked up with their tongue.~
+No.~
+~
+0 0 0 5 5 0 0
+
+x-ice~
+On who?~
+~
+You run a cold piece of ice down $M back, following up with your tongue.~
+$n runs a piece of ice over $N's back, following up with their tongue.~
+$n runs a piece of ice over your burning hot flesh, following up with their tongue.~
+No.~
+~
+0 0 0 6 8 0 0
+
+x-lickbody~
+Lick who's body?~
+~
+You lick $N's whole naked body slowly and gently giving $M chills down their spine.~
+$n licks $N's whole naked body right infront of you!.~
+Your whole body is slowly and gently licked by $n, which makes you very excited.~
+No.~
+~
+0 0 0 9 2 0 0
+
+x-whip~
+Who's been bad?~
+~
+You smirk slightly as you crack a whip over $N's tender skin, making $M whimper.~
+$n grins slightly as he whips $N's tender flesh, making $M whimper.~
+$n grins wickedly as they whip your tender flesh, making you whimper slightly in fear.~
+No.~
+~
+0 0 0 9 2 0 0
+
+x-bondagewhip~
+Who's been bad?~
+~
+You get out a bondage whip and whip $N on $S ass, making $M scream with pleasure!~
+$n whips $N's ass with a bondage whip, making $M scream with pleasuring sounds!~
+$n whips you on your ass with a bondage whip, causing you to make loud screams of pleasuring sounds!~
+No.~
+~
+0 0 0 9 2 0 0
+
+x-moan~
+On whom do you wish to do this?~
+~
+You start moaning 'Oh $N...oh yes...don't stop...mmMMmm...'~
+$n starts moaning 'Oh $N...oh yes...don't stop...mmMMmm...'~
+$n starts moaning 'Oh $N...oh yes...don't stop...mmMMmm...'~
+Not on yourself!~
+~
+0 2 0 1 1 0 0
+
+x-nuttella~
+On whom do you wish to do this?~
+~
+You cover $N's naked flesh with a popular choc spread, before licking it off.~
+$n smears a chocolate spread over $N's body, licking $M clean with relish~
+$n smears a popular choc spread on your naked flesh, licking it off you~
+Not on yourself!~
+~
+0 0 0 5 20 0 0
+
+x-stroke~
+On whom do you wish to do this?~
+~
+You lightly run your fingers along the insides of $S thighs.~
+$n lightly runs $s fingers along the insides of $N's thighs.~
+$n lightly runs $s fingers along the insides of your thighs.~
+Not on yourself!~
+~
+0 0 0 5 10 0 0
+
+x-grope~
+On whom do you wish to do this?~
+~
+You reach down and grope $N's genitals sensually, hoping they return your attentions~
+$n gropes $N with longing in their eyes.~
+$n reaches down, and lovingly massages your genitals, with a longing look, hoping their attentions are returned.~
+Not on yourself!~
+~
+0 0 0 5 10 0 0
+
+x-kamasutra~
+On whom do you wish to do this?~
+~
+You pull out a worn copy of the Kama Sutra, and wink suggestively at $N.~
+$n locks eyes with $N as $e pulls out $s copy of the Kama Sutra.~
+$n pulls out $s personal copy of the Kama Sutra, and winks suggestively at you~
+Not on yourself!~
+~
+0 0 0 5 10 0 0
+
+x-tender~
+On whom do you wish to do this?~
+~
+You run your fingers through $S hair and kiss $M tenderly on the lips.~
+$n runs $s fingers through $N's hair and kisses $M tenderly on the lips.~
+$n runs $s fingers through your hair and kisses you tenderly on the lips.~
+Not on yourself!~
+~
+0 0 0 1 1 0 0
+
+x-tie~
+On whom do you wish to do this?~
+~
+You tie $N to the bed posts!~
+$n ties $N's body, fixing $M helplessly on the bed.  Oh!! Kinky!~
+$n ties you to the bed post, leaving you completely at $s mercy~
+Not on yourself!~
+~
+0 0 0 15 10 0 0
+
+x-gag~
+Who needs to be gagged?~
+~
+You shove a gag in $N's mouth.~
+$n shoves a gag in $N's mouth.~
+$n opens your mouth and shoves a large ball gag into it.~
+Not on yourself!~
+~
+0 0 0 15 10 0 0
+
+x-blindfold~
+Who needs to be blindfolded?~
+~
+You place a blindfold over $S eyes.~
+$n places a blindfold over $N's eyes.~
+$n places a blindfold over your eyes.~
+Not on yourself!~
+~
+0 0 0 15 10 0 0
+
+x-withdraw~
+On whom do you wish to do this?~
+~
+You gently pull yourself free of $M.~
+$n gently pulls $mself free of $N.~
+$n gently pulls $mself free of you.~
+Not on yourself!~
+~
+0 1 0 0 0 0 0
+
+xl-candle~
+On who?~
+~
+You produce a thick white candle, and you step behind $N with it, grinning a bit as you run it up and down her pussy lips.  After a moment you push it in and twist it, starting to slowly pump it in and out.~
+$n produces a thick white candle, and walks behind $N, holding it in her hands.  She grins a bit as she pushes it to the girl's wet pussy lips, and pushes it in, twisting it as she begins to pump it in and out.~
+$n produces a thick white candle, and steps behind you as you whimper a bit.  After a moment, you feel it running up and down your cunt lips, and you let out a moan as it slips inside you, twisting as it slides in and out.~
+No.~
+~
+3 0 0 17 39 0 0
+
+xl-afinger~
+Use this on who?~
+~
+You take your finger to $N's mouth and have her lick it before taking it to her puckered ass and slowly slipping it in.~
+$N sucks lightly on $n's finger a moment before she takes it between $N's ass cheeks and pushes it in to the knuckle, twisting.~
+$n brings her finger to your lips, and you suck on it a bit before she pulls it away.  A moment later, she presses it to your tight little ass and pushes it in, twisting as you whimper softly.~
+No.~
+~
+3 0 0 20 25 0 0
+
+xl-finger~
+On whom do you wish to do this?~
+~
+You spread $N's thighs and slip your finger between them, tracing it over her lips a few times before pushing it past and into her hot and wet pink folds.~
+$n spreads $N's thighs and plunges her finger into her twat, pumping it out a few times as sweet, sticky juice spills over it.~
+$n spreads your legs and begins to trace her finger over your moistened lips, and you let out a soft moan as she slips it past them and into your hot snatch, plunging it in and out as it collects your juices.~
+No.~
+~
+3 0 250 19 30 0 0
+
+xl-gag~
+Gag who?~
+~
+You pick up your soaked panties, and wad them up into a ball, stuffing them into $N's mouth to gag her.~
+$n picks up her drenched panties, wadding them into a ball and stuffing them into $N's mouth, gagging her.~
+$n picks up her panties, soaked through with her cunt juice, and wads them into a ball, stuffing them into your mouth to gag you.~
+No.~
+~
+3 0 0 7 9 0 0
+
+xl-stroke~
+On whom do you wish to do this?~
+~
+You slip your finger between $N's legs and gently stroke her throbbing clit, making her squirm and moan.~
+$n slips her finger between $N's damp thighs and begins to softly stroke her clit, making the poor girl squirm and moan in pleasure.~
+$n slips her finger between your thighs and begins to softly stroke your throbbing clit, making you shut your eyes and moan in pleasure.~
+No.~
+~
+3 0 250 10 17 0 0
+
+xl-undress~
+On whom do you wish to do this?~
+~
+You reach back and unhook your bra, letting it slide to the floor with your panties.~
+$n reaches back and unhooks her bra, letting it fall to the floor along with her panties.~
+$n reaches back and unhooks her bra, letting it fall to the floor along with her panties.~
+Pick a valid target.~
+~
+3 0 250 15 15 0 0
+
+xl-lick~
+On whom do you wish to do this?~
+~
+You bury your face between $N's thighs, letting your tongue slide over her swollen pussy lips and gently tease her clit.~
+$n pushes $N to the floor and buries her face between her thighs, letting her tongue slide over $N's pussy lips and caress her clit.~
+$n pushes you to the floor, burying her face between your damp thighs as she lets her tongue caress your swollen pussy lips, and you squirm as it lightly runs over your clit.~
+No.~
+~
+3 0 250 25 37 0 0
+
+xl-69~
+On whom do you wish to do this?~
+~
+You lie down on your back and motion for $N to straddle your face, moaning as she licks at you while you hungrily devour her wet snatch.~
+$N lowers her pussy over $n's face and places her face between her thighs, both of them gasping as their tongues dart in and out of each other.~
+$n pulls you on top of her, placing your hot, wet pussy right over her face, and you do the same, both of you panting and moaning as you devour each other.~
+No.~
+~
+3 1 250 40 40 0 0
+
+xl-breasts~
+On whom do you wish to do this?~
+~
+You lean forward and place your hands over $N's supple breasts, kneading them softly as she moans.~
+$n places her hands over $N's soft breasts and begins to gently knead them, smiling as she begins to moan.~
+$n places her hands over your soft breasts and begins to knead them, a smile playing over her face as you start moaning.~
+No.~
+~
+3 0 250 10 18 0 0
+
+xf-oral~
+On whom do you wish to do this?~
+~
+You take $N's hot member in your hands, licking his cock from base to tip.~
+$n takes $N's penis in $s hands, licking $N's cock from base to tip.~
+You let out a small moan as $n takes your cock into her hands, licking it from your balls to the tip.~
+On yourself? I'm impressed!~
+~
+2 0 0 5 15 0 0
+
+xf-cum~
+Wrong...~
+~
+You feel your muscles tighten for a moment, and you let out a loud moan and arch your back as you release, cumming hard as your juices run down your thighs.~
+$n arches her back and lets out a loud moan, gasping and writhing in pleasure as she cums, her juices running down her thighs.~
+$n arches her back and lets out a loud moan, gasping and writhing in pleasure as her juices gush down her thighs.~
+No.~
+~
+2 1 0 500 25 0 0
+
+xf-cface~
+Wrong...~
+~
+You bite down hard on your lip, letting out a loud moan as you climax, gushing your sticky, wet cum all over $N's face, glazing it over.~
+$n bites down on her lip and lets out a loud cry of pleasure, gushing her juices all over $N's face as he sucks and slurps at her dripping wet pussy.~
+$n bites down on her lip and lets out a loud moan as you slurp at her dripping wet cunt, and she shudders before gushing her sweet juices all over your face, glazing it completely over.~
+No.~
+~
+2 1 0 500 30 0 0
+
+xf-chands~
+No...~
+~
+You keep sliding your hands back and forth over $N's cock as it grows hotter and hotter, not stopping until he lets out a low groan and fills your hand with his hot, sticky cum.~
+$n slides her hands back and forth over $N's cock as he moans, eventually gritting his teeth and shutting his eyes as he fills her hand full of his hot sticky load of cum, most of it oozing out from between her fingertips.~
+$n slides her hands over your cock as it grows hotter and hotter, and you let out a low moan as you grit your teeth and shoot a hot, sticky load of cum into her closed hands, filling it up as most of your gooey sperm drips out from between her fingertips.~
+No.~
+~
+2 1 0 30 500 0 0
+
+xf-cbreasts~
+No..~
+~
+You take $N's twitching cock between your hands, and aim it straight at your heaving tits, jerking him off until you feel stream after stream of hot, white cum splatter against them and trickle over your stiff nipples.~
+$n takes $N's stiff cock in her hands and aims it at her soft tits, giving him a few quick jerks to finish him off as he shoots out a jet of hot, sticky cum all over her ample mounds and hard nipples.~
+$n takes your cock into her hands and aims it straight at her tits, giving you a few quick jerks to finish you off, and you moan as you shoot your sticky white seed all over her soft breasts, your cum oozing down and trickling over her nipples.~
+No.~
+~
+1 1 0 37 500 0 0
+
+xf-spank~
+Who's been naughty?~
+~
+You take $N over your knee and spank him hard, making him squirm.~
+$n bends $N over her knees and spanks him hard on the ass, making him squirm.~
+You whimper softly as $n takes you over her knee, spanking you hard on the ass, making it sting.~
+Nah.~
+~
+2 0 0 25 4 0 0
+
+xf-urine~
+On whom do you wish to do this?~
+~
+You maliciously lean $N's head back and stand over him with his mouth open before letting a hard stream of piss shoot down his throat.~
+$n shoots a golden stream of urine down $N's throat, making him choke and swallow.~
+You eyes widen as your mistress shoots a stream of piss down your throat, making you swallow it all.~
+Nope.~
+~
+2 0 0 37 -10 0 0
+
+xf-beg~
+Beg who, you stupid slut?~
+~
+You drop to your kneees before $N, begging for him to abuse you and fuck you hard.~
+$n drops to her knees and begs for $N to take her and use her for his pleasure.~
+$n drops to her knees before you, begging for you to abuse her worthless slut body.~
+It doesn't work that way, you stupid whore.~
+~
+2 0 0 -10 12 0 0
+
+xf-blowjob~
+On whom do you wish to do this?~
+~
+You take $N's hot member in your mouth, sucking $S shaft.~
+$n takes $N's throbbing penis in $s mouth, sucking $N's cock.~
+You gasp as $n takes your penis in $s mouth, licking your head.~
+On yourself? I'm impressed!~
+~
+2 1 250 10 25 0 0
+
+xf-knobsuck~
+Who's knob do you wanna suck??~
+~
+You take $N's hot member in your mouth, and suck on $S knob.~
+$n takes $N's throbbing penis in $s mouth, and sucks on $N's knob.~
+You gasp as $n takes your penis in $s mouth, and sucks on the knob.~
+On yourself? I'm impressed!~
+~
+2 1 250 10 25 0 0
+
+xf-nutsuck~
+Who's sperm sack do you wanna suck?~
+~
+You jerk $N's cock, while sucking on $S nutsack.~
+$n jerks $N's cock in $s hand, while sucking on $N's nutsack.~
+You grin as $n jerks your cock in $s hand, and sucks on your nuts.~
+On yourself? I'm impressed!~
+~
+2 1 250 10 25 0 0
+
+xf-tip~
+On whom do you wish to do this?~
+~
+You gently run the tip of your tongue along the underside of $N's hot cock.~
+$n runs the tip of $s tongue along the bottom of $N's pulsing cock.~
+You let out a low moan as $n runs the tip of her tongue along the underside of your cock.~
+I think not.~
+~
+2 0 0 5 59 0 0
+
+xf-handjob~
+On who?~
+~
+You take his hot cock in your hand and wrap your fingers around it, slowly pumping up and down.~
+$n takes $N's hot cock in her hands, wrapping her fingers around it as she slowly pumps up and down.~
+$n takes your hot cock into her hands, and you moan softly as she wraps her fingers around it, slowly pumping up and down.~
+No.~
+~
+2 0 0 9 14 0 0
+
+xf-sitface~
+Who gets to taste your sweet juice?~
+~
+You push $N onto his back and crawl up his body, sitting down on his face as he licks at your pussy.~
+$n pushes $N onto his back and straddles his face, moaning as he licks her hot pussy.~
+$n pushes you onto your back and straddles your face, moaning and squirming as you eagerly lap at her hot, wet cunt.~
+No.~
+~
+2 1 250 15 0 0 0
+
+xf-69~
+Who?~
+~
+You crawl on top of $N and takes his hot cock between your lips, moaning as he laps at your cunt.~
+$n pushes $N onto his back and crawls on top of him, sucking his cock while he wriggles his tongue about in her cunt.~
+$n pushes you onto your back, crawling on top of you as she sucks on your cock, moaning while you lick her pussy.~
+No.~
+~
+2 1 250 20 20 1 0
+
+xf-breasts~
+On whom do you wish to do this?~
+~
+You take $S hands and press them to your breasts.~
+$n takes $N's hands and presses them to $m breasts.~
+$n takes your hands and presses them to $m breasts.~
+Not on yourself!~
+~
+2 0 0 5 10 0 0
+
+xf-rub~
+Who gets to feel the magic touch?~
+~
+You gently run your fingers over $N's hardening cock.~
+$n gently runs her fingers over $N's hardening cock.~
+$n gently runs her fingers over your hardening cock.~
+You don't have a penis.  At least, I hope not.~
+~
+2 0 0 15 20 0 0
+
+xf-contract~
+On whom do you wish to do this?~
+~
+You contract your vaginal muscles, driving $M wild.~
+$n contracts $m vaginal muscles, driving $N wild.~
+$n contracts $m vaginal muscles, driving you wild.~
+Not on yourself!~
+~
+2 2 0 10 15 1 0
+
+xf-afinger~
+Use this on who?~
+~
+You lick your finger and press it to $N's ass, pushing lightly until it pops in and he lets out a small moan.~
+$n licks her finger and takes it to $N's ass, popping it in and gently pumping it back and forth, making him moan.~
+$n licks her finger and takes it to your ass, pushing it in and pumping it in and out, making your dick rock-hard as you moan.~
+No.~
+~
+2 1 0 20 23 0 0
+
+xf-finger~
+On whom do you wish to do this?~
+~
+You put your hands between your legs and begin to masterbate for $N.~
+$n puts $m hands between $m legs and begins to masterbate for $N.~
+$n puts $m hands between $m legs and begins to masterbate for your viewing pleasure.  What a turn on!.~
+Not on yourself!~
+~
+2 0 0 20 10 0 0
+
+xf-floor~
+On whom do you wish to do this?~
+~
+You lie on your back, and pull $M between your parted legs.~
+$n lies on $m back, and pulls $N between $m parted legs.~
+$n lies on $m back, and pulls you between $m parted legs.~
+Not on yourself!~
+~
+2 1 250 25 20 1 0
+
+xf-grind~
+On whom do you wish to do this?~
+~
+You grind your hips up to meet $S thrusts.~
+$n grinds $m hips up to meet $N's thrusts.~
+$n grinds $m hips up to meet your thrusts.~
+Not on yourself!~
+~
+2 2 0 15 10 1 0
+
+xf-mount~
+On whom do you wish to do this?~
+~
+You push $M onto $S back, and slowly lower yourself onto $S erection.~
+$n pushes $N onto $S back, and slowly lowers $mself onto $S erection.~
+$n pushes you onto your back, and slowly lowers $mself onto your erection.~
+Not on yourself!~
+~
+2 1 250 25 20 1 0
+
+xf-cowgirl~
+On whom do you wish to do this?~
+~
+You lay $N on his back, and lower yourself onto his erection, then begin raising and lowering yourself on his hard cock, riding it like the cowgirl you are at heart.  You scream with pleasure as you scratch long marks into his chest.~
+$n lowers herself onto $N's erection, then starts riding him like the cowgirl she is!~
+$n lays you flat on your back, and lowers herself onto your errection, then begins raising and lowering herself, riding your cock like cowboy would ride a bull.  She digs her nails into your chest as she screams with pleasure.~
+Not on yourself!~
+~
+2 1 250 25 20 1 0
+
+xf-kamasutra~
+On whom do you wish to do this?~
+~
+You crawl on top of $N, and the two of you begin going through every position in the Kama Sutra, becomming a huge mass of sweat, fluid, moaning, and screaming as you shred his back with your formidable fingernails.~
+$n crawls on top of $N, and they become entwined in each other as they go through the positions of the Kama Sutra.  If a healthy sex life is good, these two are the epitome of goodness.~
+$n crawls on top of you, and the two of you merge together in one giant mass of fluids, sweat, screaming, and moaning, as you go through the pages of the Kama Sutra.$n shreds the skin from your back with her strong fingernails, overcome in the passion of your lovemaking.~
+Not on yourself!~
+~
+2 1 250 25 20 1 0
+
+xf-climb~
+On whom do you wish to do this?~
+~
+You climb up onto $N, hold on tight, lower youself onto his erection, and begin fucking him while hanging off his shoulders.~
+$n jumps onto $N, and begins fucking him while hanging off his shoulders.~
+$N wraps their arms around your shoulders, and lowers herself onto your erection, and uses her arms to pull herself up and down on top of you.~
+Not on yourself!~
+~
+2 1 250 25 20 1 0
+
+xf-bounce~
+On whom do you wish to do this?~
+~
+You bounce up and down on $N's hips, thrusting his cock in and out of your pussy!~
+$n starts bouncing herself on $N, thrusting herself on his hard cock.~
+$n bounces up and down on your hips, thrusting herself on your cock.~
+Not on yourself!~
+~
+2 1 250 25 20 1 0
+
+xf-nails~
+On whom do you wish to do this?~
+~
+You scratch your nails down $S back.~
+$n scratches $m nails down $N's back.~
+$n scratches $m nails down your back.~
+Not on yourself!~
+~
+2 2 0 5 1 1 0
+
+xf-pull~
+On whom do you wish to do this?~
+~
+You wrap your arms and legs around $M and pull $M into you.~
+$n wraps $m arms and legs around $N and pulls $M into $m.~
+$n wraps $m arms and legs around you and pulls you into $m.~
+Not on yourself!~
+~
+2 2 0 15 10 1 0
+
+xf-sitfuck~
+On whom do you wish to do this?~
+~
+You push $N into a chair, and lower yourself down onto his cock.  You slowly grind yourself back and forth on his cock as you both moan in pleasure.~
+$n pushes $N into a chair, and sits on his cock, slowly fucking him.~
+$n pushes you into a chair, then lowers herself onto your hardened cock.  She then slowly grinds herself down hard onto your erection as you both moan in extasy.~
+Not on yourself!~
+~
+2 2 0 15 10 1 0
+
+xf-squeeze~
+On whom do you wish to do this?~
+~
+Your wrap your legs around $M and squeeze tightly.~
+$n wraps $m legs around $N and squeezes tightly.~
+$n wraps $m legs around you and squeezes tightly.~
+Not on yourself!~
+~
+2 2 0 15 10 1 0
+
+xf-titfuck~
+Whom do you wish to treat to this?~
+~
+You take $N's cock and place it between your breasts, as $N gently thrusts.~
+$n takes $N's penis, places it between $s breasts, and wanks $M off.~
+$n takes your cock, places it between her breasts, and wanks you gently with them.~
+Not on yourself!~
+~
+2 1 0 10 20 0 0
+
+xf-fondle~
+On whom do you wish to perform this?~
+~
+You reach down and gently fondle $N's warm penis.~
+$n takes $N's cock into her hands, fondling it gently.~
+$n takes your warm cock into her hands, fondling you gently.~
+No.~
+~
+2 0 0 5 13 0 0
+
+xf-bob~
+On whom do you wish to perform this?~
+~
+You wrap your lips tight around $N's cock and bob your head back and forth, forcing him into your mouth.~
+$n wraps her lips over $N's cock and bobs her head back and forth, making him fuck her mouth.~
+$n wraps her lips tight around your cock and bobs her head back and forth, pumping your length in and out of her mouth.~
+No.~
+~
+2 2 0 20 25 1 0
+
+xf-undress~
+On whom do you wish to do this?~
+~
+You push $N onto the floor, a gleam in your eyes, and tear $S clothes off.~
+$n pushes $N to the floor, tears $S clothes from $S body.~
+$n pushes you to the floor, grins, and rips your clothes from your body.~
+Not on yourself!~
+~
+2 0 0 1 1 0 0
+
+xm-anal~
+On whom do you wish to do this?~
+~
+$N screams in extacy as you come from behind and penetrate $M tight ass from behind.~
+$n comes from behind $N and penetrates $M tight ass from behind.~
+You scream as $n comes from behind and penetrates your tight ass from behind!~
+Not on yourself!~
+~
+1 1 250 25 25 0 0
+
+xm-spank~
+Who's the naughty whore?~
+~
+You grab $N by the hair and throw her over your knees, slapping her hard on the ass.~
+$n visciously throws $N over his knee, spanking her relentlessly on her tight ass.~
+You cry out softly as $n visciously takes you over his knee, spanking you mercilessly.~
+Nah.~
+~
+1 0 0 33 -14 0 0
+
+xm-69~
+Whom do you wish to perform this on?~
+~
+You pull $N on top of you and spread her legs, burying your face in her pussy as she sucks on your hard cock.~
+$n pulls $N on top of him and buries his face between her legs, eating her out as she goes down on his cock.~
+$n pulls you on top of him and spreads your legs, burying his face between your legs and sucking on your clit as you takes his cock into your mouth.~
+No.~
+~
+1 2 0 24 24 1 0
+
+xm-urine~
+Who gets to taste it?~
+~
+You force open $N's slutty mouth and shoot a hot stream of piss into it, making her swallow.~
+$n forces open $Ns mouth and shoots a hot stream of golden piss into it, making her swallow.~
+$n forces open your slutty mouth and shoots a hot, golden stream of his piss into it, making you swallow.~
+No.~
+~
+1 0 0 40 -19 0 0
+
+xm-beg~
+Beg who, you worthless bitchboy?~
+~
+You drop to your knees, tears in your eyes, and beg for $N to take you as hers.~
+$n drops to his knees before $N, begging for her to take him as hers.~
+$n drops to his knees before you with tears in his eyes, sobbing as he begs for you to take him as your own personal toy.~
+You worthless slut, you can't even do this right.~
+~
+1 0 0 -15 30 0 0
+
+xm-facial~
+Who gets to have their slutty face done over?~
+~
+You groan as you shoot your load across her delicate features, your hot cum coating her face and dripping from her chin.~
+$n grits his teeth as he shoots his sticky cum over $N's face, moaning as she licks her lips and lets it drip down.~
+$n's eyes widen as he shoots his hot, sticky cum over your face, letting it drip from your chin and trickle over your lips.~
+Nope.~
+~
+1 2 0 300 20 1 0
+
+xm-chair~
+Cum in whose hair?~
+~
+You pull your hard cock out of $N's hole, and force her to her knees before you as you finish yourself off with your hand, shooting your gooey wad straight into her hair and using a handfull of it to wipe off the sticky head.~
+$n pulls his cock out of $N's hole, and forces her to her knees, jerking himself off for a moment before shooting his hot, sticky sperm into her hair, and he takes a handfull of it to wipe off the head of his still-stiff meat.~
+$n pulls himself out of your hole, and forces you to your knees before him, jerking off into your hair as you look up.  A hot, gooey splatter of cum smacks against your scalp, and he takes a handfull of your hair to wipe off the still-sticky head of his cock.~
+No.~
+~
+1 1 0 500 47 0 0
+
+xm-canal~
+Cum in whose ass?~
+~
+You pump your cock in and out of $N's ass a few more times before grunting and shooting your sticky load of cum right up it, feeling it fill and trickle over your still-hard cock and down her thighs.~
+$n pumps into $N's tight ass a few more times before he grunts, holding his cock there as he shoots her full of cum, and she lets out a tiny gasp as a little bit oozes out of her tight ass and trickles down her thighs.~
+$n shoves his cock into your tight little ass a few more times, and you hear a grunt from behind you as he starts to cum, shooting a sticky white jet of his cream straight up your ass, and you feel a bit of it trickle out and run down your thighs.~
+No.~
+~
+1 1 0 500 47 0 0
+
+xm-cbreasts~
+So close, yet, so far away?~
+~
+You let out a low moan as you release your load into $N, filling her up with your hot cum.~
+$n cries out as he shoots his hot, sticky cum all inside of $N, his creamy load shooting home.~
+$n grits his teeth and shoots his sticky cum inside of yor whorish body, filling you up until it drips out.~
+Nopers.~
+~
+1 1 0 300 20 1 0
+
+xm-chand~
+So close, yet, so far away?~
+~
+You let out a low moan as you release your load into $N, filling her up with your hot cum.~
+$n cries out as he shoots his hot, sticky cum all inside of $N, his creamy load shooting home.~
+$n grits his teeth and shoots his sticky cum inside of yor whorish body, filling you up until it drips out.~
+Nopers.~
+~
+1 1 0 300 20 1 0
+
+xm-cummouth~
+Who gets to have their slutty mouth done over?~
+~
+You close your eyes tightly as you let a big blast of cum into $N's mouth.~
+$n cums into $N's mouth, oh my god!~
+$n cums into your mouth, causing you to swallow his hot sticky juices.~
+Nope.~
+~
+1 2 0 300 20 1 0
+
+xm-cumbelle~
+Who gets cum on their belle??~
+~
+You groan as you shoot your load on her stomach, leaving your massive cock resting on her snatch.~
+$n grits his teeth as he shoots his sticky cum over $N's stomach, and rests his cock on her snatch.~
+$n's eyes widen as he shoots his hot, sticky cum over your stomach, then resting his cock on your sweet snatch.~
+Nope.~
+~
+1 2 250 300 20 1 0
+
+xm-asscum~
+Who gets cum on thier ass??~
+~
+You groan as you shoot your load on her ass.~
+$n grits his teeth as he shoots his sticky cum over $N's slutty ass.~
+$n's eyes widen as he shoots his hot, sticky cum all over your ass.~
+Nope.~
+~
+1 2 250 300 20 1 0
+
+xm-cum~
+So close, yet, so far away?~
+~
+You let out a low moan as you release your load into $N, filling her up with your hot cum.~
+$n cries out as he shoots his hot, sticky cum all inside of $N, his creamy load shooting home.~
+$n grits his teeth and shoots his sticky cum inside of yor whorish body, filling you up until it drips out.~
+Nopers.~
+~
+1 2 0 300 20 1 0
+
+xm-breasts~
+On whom do you wish to do this?~
+~
+You gently run the tip of your tongue across $M naked breasts.~
+$n gently runs the tip of $s tongue across $N's naked breasts.~
+$n gently runs the tip of $s tongue across your naked breasts.~
+Not on yourself!~
+~
+1 0 0 5 10 0 0
+
+xm-cup~
+On whom do you wish to do this?~
+~
+You cup $N's breasts in your hands, and caress $S nipples.~
+$n cups $N's breasts in $s hands and caress' $S nipples.~
+$n cups your breasts in $s palms and caress' your nipples.~
+ON YOURSELF??~
+~
+1 0 0 1 5 0 0
+
+xm-doggy~
+On whom do you wish to do this?~
+~
+You roll $M onto all fours and penetrate $M hot flesh from behind.~
+$n rolls $N onto all fours and penetrates $M hot flesh from behind.~
+$n rolls you onto all fours and penetrates your hot flesh from behind.~
+Not on yourself!~
+~
+1 1 250 25 15 0 0
+
+xm-finger~
+On whom do you wish to do this?~
+~
+You slide your fingers between $M legs, gently stroking $M clitoris.~
+$n slides $s fingers between $N's legs, gently stroking $M clitoris.~
+$n slides $s fingers between your legs, gently stroking your clitoris.~
+Not on yourself!~
+~
+1 0 250 0 10 0 0
+
+xm-fist~
+On whom do you wish to do this? I hope you asked!~
+~
+You make a fist and thrust it up $N's spread wide vagina as she screams with pleasure.~
+$N gasps as $n pushes $s hand up between $S legs into $S vagina.~
+$n spreads your legs wide, and thrusts $s hand up your vagina making you cry out in pleasure.~
+C'est non possible.. I hope...~
+~
+1 1 250 5 15 0 0
+
+xm-Dildo~
+On whom do you wish to do this? I hope you asked!~
+~
+You shove a dildo into $N's pussy making her squirm and moan with pleasure.~
+$n shoves a dildo in $N's pussy, making her squirm and make moaning sounds.~
+$n shoves a dildo into your pussy making you squirm and moan.~
+C'est non possible.. I hope...~
+~
+1 1 250 5 15 0 0
+
+xm-floor~
+On whom do you wish to do this?~
+~
+You lower $M to the floor, and slide your body between $M parted legs.~
+$n lowers $N to the floor, and slides $s body between $M parted legs.~
+$n lowers you to the floor, and slides $s body between your parted legs.~
+Not on yourself!~
+~
+1 1 250 15 10 1 0
+
+xm-sitfuck~
+On whom do you wish to do this?~
+~
+You sit down as $N climbs onto your lap.  You enter her sopping hole, and fuck her slowly, as she moans and bites down on your neck.~
+$n sits down, and $N climbs onto his lap, where they slowly fuck while $N moans and bites on his neck.~
+$n sits down, as you climb onto his lap. $n enters you, and fucks you slowly, as you moan uncontrollably, and bite on his neck.~
+Not on yourself!~
+~
+1 1 250 15 10 1 0
+
+xm-bounce~
+On whom do you wish to do this?~
+~
+You bounce $N's hips against yours roughly making her scream with pleasure!~
+$n bounces $N's body on his hips, thrusting her with every bounce.~
+$n bounces your hips onto his, thrusting you with every fierce bounce..~
+Not on yourself!~
+~
+1 1 250 15 10 1 0
+
+xm-jerkoff~
+On whom do you wish to do this?~
+~
+You grab your penis and begin to jerkoff for $N.~
+$n grabs his penis and begins to jerkoff for $N.~
+$n grab his penis and begin to jerkoff for your viewing pleasure.  What a turn on!.~
+Not on yourself!~
+~
+1 1 0 25 5 0 0
+
+xm-throb~
+On whom do you wish to do this?~
+~
+You make a minor pause in your lovemaking, keeping your cock fully inside of $N's wet hole, and while you sit there, you let her feel the throbbing of your cock, as she arches her back and moans.~
+$n pauses in his lovemaking with $N and all of a sudden, she arches her back, and starts moaning.~
+$n stops for a moment, and you wonder if something might be wrong.  Then you feel his hard cock throbbing inside of you, and it drives you wild with excitement as you arch your back and moan.~
+Not on yourself!~
+~
+1 1 0 25 5 0 0
+
+xm-rape~
+On whom do you wish to do this?~
+~
+You grab $S and rape her!~
+$n grabs $S and rapes her!~
+$n grabs you and raveges you with his enourmous cock!.~
+Not on yourself!~
+~
+1 1 0 25 5 0 0
+
+xm-kamasutra~
+On whom do you wish to do this?~
+~
+You take $N in your arms, and go through each position of the Kama Sutra, comming together in sweaty mass of moaning, screaming, thrusting, grinding, and scratching.  $N moans wildly in your arms as the two of you struggle to make it through the last couple positions.~
+Right in front of your eyes, $n takes $N into his arms, and together, they go through every position in the karma Sutra.  You mutter 'Sex fiends' under your breath, and try to ignore them.~
+$n takes you in his arms, and the two of you go through each position of the Kama Sutra, becomming a mass of sweaty, moaning, screaming, thrusting, grinding, and scratching.  You moan wildly in $n's arms, as the two of you struggle to hold on through the last couple positions.~
+Not on yourself!~
+~
+1 1 0 25 5 0 0
+
+xm-nipple~
+On whom do you wish to do this?~
+~
+You gently twist $M nipple between your thumb and forefinger.~
+$n gently twists $N's nipple between $s thumb and forefinger.~
+$n gently twists your nipple between $s thumb and forefinger.~
+Not on yourself!~
+~
+1 0 0 5 10 0 0
+
+xm-oral~
+On whom do you wish to do this?~
+~
+$N squirms in delight as you bend down and run your tongue along and into $S vagina.~
+$N squirms ecstatically as $n licks and kisses $S loveslit.~
+$n wriggles $s tongue about between your legs, making you squirm in ecstacy.~
+Biologically impossible I think you'll find!~
+~
+1 0 0 10 25 0 0
+
+xm-clitsuck~
+On whom do you wish to do this?~
+~
+$N squirms as you suck on $S clit.~
+$N squirms as $n sucks on $S loveslit.~
+$n sucks on your clit, making you squirm on his face.~
+Biologically impossible I think you'll find!~
+~
+1 0 0 10 25 0 0
+
+xm-press~
+On whom do you wish to do this?~
+~
+You press $M against the wall, pulling $M legs around your hips.~
+$n presses $N against the wall, pulling $M legs around $s hips.~
+$n presses you against the wall, pulling your legs around $s hips.~
+Not on yourself!~
+~
+1 1 250 25 20 1 0
+
+xm-standfuck~
+On whom do you wish to do this?~
+~
+$N wraps their arms and legs around you as you pick her up, begin thrusting into her while standing up.~
+$n picks up $N, and they start fucking while standing up.~
+You wrap your arms and legs around $n, as he picks you up, and begins jamming his cock deep into your pussy.~
+Not on yourself!~
+~
+1 1 250 25 20 1 0
+
+xm-pull~
+On whom do you wish to do this?~
+~
+You grab $M around the hips and pull $M firmly onto your erection.~
+$n grabs $N around the hips and pull $M firmly onto $s erection.~
+$n grabs you around the hips and pulls you firmly onto $s erection.~
+Not on yourself!~
+~
+1 2 0 10 10 1 0
+
+xm-spoon~
+On whom do you wish to do this?~
+~
+You roll $M onto $S side and penetrate $M hot flesh from behind.~
+$n rolls $N onto $S side and penetrates $M hot flesh from behind.~
+$n rolls you onto your side and penetrates your hot flesh from behind.~
+Not on yourself!~
+~
+1 1 250 20 20 1 0
+
+xm-suck~
+On whom do you wish to do this?~
+~
+You suck slowly on $M nipple, feeling it harden between your lips.~
+$n suck slowly on $N's nipple.~
+$n sucks slowly on your nipple, and you feel it harden between $s lips.~
+Not on yourself!~
+~
+1 0 0 5 10 0 0
+
+xm-thrust~
+On whom do you wish to do this?~
+~
+You thrust deeply between $M warm, slippery thighs.~
+$n thrusts deeply between $N's warm, slippery thighs.~
+$n thrusts deeply between your warm, slippery thighs.~
+Not on yourself!~
+~
+1 2 0 15 10 1 0
+
+xm-beat~
+On whom do you wish to do this?~
+~
+You move between $N's legs, and smack your hardening cock on her mound over and over again, as she squirms around where she lays, you kiss her firmly.~
+$n gets in between $N's legs, and smacks his cock on her mound several times as he kisses her while she squirms.~
+$n moves in between your legs, and smacks his cock on your mound several times as he kisses you while you squirm around under his attentions.~
+Not on yourself!~
+~
+1 2 0 15 10 1 0
+
+xm-fastfuck~
+On whom do you wish to do this?~
+~
+You steer yourself between $N's legs, and begin thrusting with intense speed, as $N screams and rakes your back with her nails.~
+$n gets between $N's legs, and begins thrusting his cock into her with exceptional speed.  This guy's workin' it like a champ!~
+$n aims himself between your legs, and begins thrusting his cock into you with such speed that the room blurrs with the passion of his lovemaking.~
+Not on yourself!~
+~
+1 2 0 15 10 1 0
+
+xf-rimjob~
+Whom would you do this to?~
+~
+You lick $N's hot asshole!~
+$n lick's $N's hot asshole.~
+$n licks your hot asshole.~
+Not on yourself, Fool!~
+~
+2 2 0 5 5 2 0
+
+xg-rape~
+Whom would you do this to?~
+~
+You rip off $N's clothes and shove your hot, hard cock into his asshole.~
+$n rips off $N's clothes and shoves his hot, hard cock into $N's asshole.~
+$n rips off your clothes and shoves his hot, hard cock into your asshole.~
+No! Not yourself!~
+~
+4 1 0 6 2 3 0
+
+xl-rape~
+Whom would you like to do this to?~
+~
+You grab $N, ripping off her clothes and shoving your fingers deep within her pussy!~
+$n grabs $N, ripping off $N's clothes and $n shoves her fingers deep within $Ns pussy!~
+$n grabs you, ripping off your clothes and shoving her fingers deep within your pussy!~
+Not yourself, fool.~
+~
+3 1 0 4 2 5 0
+
+xl-fistfuck~
+Whom would you do this to?~
+~
+You grab $N and shove your fist deep inside her pussy, causing her to squirm and moan.~
+$n grabs $N and shoves her fist deep inside $N's pussy, causing her to squirm and moan.~
+$n grabs you and shoves her fist deep inside your pussy, causing you to squirm and moan.~
+Not yourself!~
+~
+3 2 0 5 6 2 0
+
+xf-whisperfuck~
+Whom would you do this to?~
+~
+You whisper sweetly in $N's ear while you fuck his brains out.~
+$n whispers into $N's ear while she fucks his brains out.~
+$n whispers sweetly in your ear while she fucks your brains out.~
+Not to yourself!~
+~
+2 2 0 3 6 3 0
+
+xm-whisperfuck~
+Whom would you do this?~
+~
+You whisper softly into $N's ear as you press your cock deep and hard into $N's hot, wet pussy.~
+$n whispers softly into $N's ear as he presses his cock hard and deep into $N's pussy.~
+$n whispers softly into your ear as he presses his cock harder and deeper into your hot, wet pussy.~
+Not yourself, you crazy fool!~
+~
+1 2 0 4 6 2 0
+
+xm-condom~
+Whom would you do this to?~
+~
+You wave a condom to $N suggesting something to her.~
+$n waves a condom to $N suggesting something to her.~
+$n waves a condom, suggesting something to you.~
+Do you really want to do that? Didn't think so.~
+~
+1 0 0 1 1 2 0
+
+xg-condom~
+Whom would you do this to?~
+~
+You wave a condom to $N suggesting something to him, some anal loving that is.~
+$n waves a condom to $N suggesting something to him, some anal loving.~
+$n waves a condom, suggesting something to you, which of course is anal loving.~
+Do you really want to do that? Probably, but you can't!~
+~
+4 0 0 2 3 2 0
+
+xf-condom~
+Whom would you do this to?~
+~
+You wave a condom to $N suggesting something to him, maybe some hot passionate monkey sex?~
+$n waves a condom to $N suggesting something to him, wanting hot passionate monkey sex!~
+$n waves a condom, suggesting something to you, which is hot passionate monkey sex. Mmmmm..~
+Do you really want to do that? Didn't think so.~
+~
+2 0 0 3 5 1 0
+
+xg-assfuck~
+Who would you like to do this to?~
+~
+You fuck the shit out of $N's asshole as you pump your hard cock into his ass.~
+$n fucks the shit out of $N's asshole as $n pumps his cock hard into $N's ass.~
+$n fucks the shit out of your asshole as he pumps his hard cock into your ass.~
+NOT YOURSELF!!!!~
+~
+4 1 0 3 6 4 0
+
+xg-fingerass~
+Who do you want to do this to?~
+~
+You finger $N's tight asshole, making him squirm.~
+$n fingers $N's tight asshole, making $N squirm.~
+$n fingers your tight asshole, making you squirm.~
+Don't finger yourself!~
+~
+4 0 0 3 6 2 0
+
+xg-cum~
+Who would you like to do this to?~
+~
+You grunt and shoot your hot sticky cum all over $N's back and ass.~
+$n grunts and shoots his hot sticky cum all over $N's back and ass.~
+$n grunts and shoots his hot sticky cum all over your back and ass.~
+Don't cum on yourself!~
+~
+4 3 3 300 2 7 0
+
+xg-nutstroke~
+Who would you do this to?~
+~
+You stroke $N's nuts within your warm hand, making him squirm.~
+$n strokes $N's nuts within his warm hand, making $N squirm.~
+$n strokes your nuts within his warm hand, making you squirm.~
+Don't do that to yourself.~
+~
+4 0 0 3 6 2 0
+
+xg-blowjob~
+Who do you wish to suck?~
+~
+You suck on $N's warm hard cock, making him squirm and moan.~
+$n sucks on $N's warm hard cock, making $N squirm and moan.~
+$n sucks on your warm hard cock, making you moan and squirm about.~
+No, not yourself!~
+~
+4 1 0 2 6 3 0
+
+xf-nutstroke~
+Who would you want to do this to?~
+~
+You gently stroke $N's nuts within your warm hand, causing him to moan and squirm.~
+$n gently strokes $N's nuts within her hand, causing $N to moan and squirm about.~
+$n gently strokes your nuts within her warm hand, causing you to moan and squirm.~
+You can't do that to yourself!~
+~
+2 0 0 2 5 3 0
+
+xf-breastlick~
+Whom would you do this to?~
+~
+You take your breasts within your hands and lick them suggestively to $N.~
+$n takes her breasts within her hands and licks them suggestively to $N.~
+$n takes her breasts within her hands and licks them, suggestively.~
+Don't do that!~
+~
+2 0 0 1 5 3 0
+
+xf-lick~
+Who would you do this to?~
+~
+You lick $N's chest slowly and softly, causing him to giggle some.~
+$n licks $N's chest slowly and softly, causing him to giggle.~
+$n licks your chest slowly and softly, tickling you a little.~
+Not to yourself!~
+~
+2 0 0 2 3 1 0
+
+xm-rimjob~
+Who would you do this to?~
+~
+You lick $N's hot asshole!~
+$n licks $N's hot asshole!~
+$n licks your hot asshole.~
+Not yourself!~
+~
+1 0 0 3 6 2 0
+
+xl-clitstroke~
+Who would you do this to?~
+~
+you stroke $N's clitoris softly and slowly, teasing her and causing her to moan and squirm all over.~
+$n strokes $N's clitoris softly and slowly, teasing $N and causing $N to moan and squirm.~
+$n strokes your clitoris softly and slowly, almost like she was teasing you making you moan and squirm.~
+Not Yourself!~
+~
+3 0 0 3 7 3 0
+
+xf-rape~
+Who would you do this to?~
+~
+You grab $N and tear off his clothes and start rubbing and sucking on his hard cock.~
+$n grabs $N and tears off $N's clothing and starts rubbing and sucking $N's cock.~
+$n grabs you and tears off your clothes and starts rubbing and sucking on your cock.~
+Not yourself!~
+~
+2 0 0 5 7 2 0
+
+xg-rimjob~
+Who would you do this to?~
+~
+You lick $N's hot asshole.~
+$n licks $N's hot asshole.~
+$n licks your hot asshole.~
+Not yourself!~
+~
+4 0 0 3 6 2 0
+
+xg-bob~
+Who would you do this to?~
+~
+You put your lips around $N's hard, hot cock and bob your head back and forth.~
+$n puts $N's hard, hot cock in their mouth and bob their head back and forth, sucking on it hard.~
+$n puts his lips around your hard, hot cock and bobs his head back and forth, sucking you hard.~
+Not on yourself!~
+~
+4 1 0 10 10 6 0
+
+xg-69~
+Who would you do this to?~
+~
+You crawl on top of $N and take his hard, hot cock between your lips, moaning as he sucks on your cock and strokes your balls.~
+$n pushes $N onto his back and crawls on top of him, sucking on his cock, while he sucks on $N's cock in return.~
+$n pushes you onto your back, crawling on top of you as he sucks on your cock, moaning while you suck on his cock in return.~
+You can't do this to yourself.~
+~
+4 1 0 10 10 3 0
+
+xg-pound~
+Who would you do this to?~
+~
+You take your hard, hot cock and shove it deep within $N's ass, pounding the shit out of his tight asshole.~
+$n takes his hard, hot cock and shoves it deep within $N's ass, pouding the shit out of his tight asshole.~
+$n takes his hard, hot cock and shoves it deep within your ass, pounding the shit out of your tight asshole.~
+Not on yourself!~
+~
+4 0 0 100 50 20 0
+
+x-humpleg~
+Who's leg do you wish to hump?~
+~
+You hump $S leg contently and viciously, enjoying every damn bit of it!~
+$n humps $N's leg contently and viciously.~
+$n humps your leg contently and viciously, and is enjoying every bit of it!~
+No, you don't want to do that.~
+~
+0 0 0 5 3 6 0
+
+xl-rimjob~
+who would you do this to?~
+~
+You lick $N's hot asshole.~
+$n licks $N's hot asshole.~
+$n licks your hot asshole.~
+Don't do that.~
+~
+3 1 0 6 10 4 0
+
+xm-hump~
+Hump Whom?~
+~
+You push $M onto all fours and mount her, madly shoving your hard cock in and out of her tiny hole.~
+$n mounts $N like she was a bitch in heat, madly shoving his cock in and out of her hole.~
+$n pushes you onto all fours and mounts you, madly shoving his hard cock in and out of your tiny hole.~
+NO!~
+~
+1 2 0 35 65 0 1
+
+xm-mfuck~
+Mouth fuck whom?~
+~
+You have $n wrap her lips tightly around your cock and you trust gently, pumping your cock in and out of her warm, wet, mouth.~
+$N wraps her lips tight around $n's cock, and he thrusts gently, in and out between her lips~
+You wrap your lips tight around $n's cock, as he thrusts gently, in and out of your mouth.~
+~
+~
+1 2 0 12 20 0 0
+
+x-hotplate~
+Do this to whom?~
+~
+You put handywrap on $N's chest and take a shit on it.~
+$n puts handwrap on $N's chest and takes a shit on it.~
+$n puts handywrap on your chest, and takes a shit on it.~
+Umm No~
+~
+0 2 3 5 10 5 0
+
+x-rhotplate~
+Do this to whom?~
+~
+You take a shit on $N's chest and put handywrap over it.~
+$n takes a shit on $N's chest and puts handywrap over it.~
+$n takes a shit on your chest and puts handywrap over it.~
+Not happening.~
+~
+0 2 3 5 10 5 0
+
+xf-blumpkin~
+Give who a 'Blumpkin'?~
+~
+You push $N onto a toilet and give him a blowjob as he takes a shit.~
+$n pushes $N onto a toilet and gives him a blowjob as he takes a shit.~
+$N pushes you onto a toilet and starts giving you a blowjob as you take a shit.~
+Not likely.~
+~
+2 3 4 10 20 5 0
+
+

@@ -1,0 +1,91 @@
+From: John Strange <gambit@communique.net>
+Subject: Bonus Command
+
+Hey guys,
+
+Well I received this bit of code from a friend then port'd it over to rom
+and added some stuff to make it work better.
+
+If you have any changes to it or find bugs would you let me know, I was
+going to add bonus all but I haven't quite figured it out yet :), I'm still
+the newbie coder learning as he goes!!!
+
+Silverhand
+Triad- viseria.telmaron.com 7777
+
+
+void do_bonus( CHAR_DATA *ch, char *argument)
+{
+    CHAR_DATA *victim;
+    char       buf  [ MAX_STRING_LENGTH ];
+    char       arg1 [ MAX_INPUT_LENGTH ];
+    char       arg2 [ MAX_INPUT_LENGTH ];
+    int      value;
+
+    argument = one_argument( argument, arg1 );
+    argument = one_argument( argument, arg2 );
+
+    if ( arg1[0] == '\0' || arg2[0] == '\0' || !is_number( arg2 ) )
+    {
+	send_to_char( "Syntax: bonus <char> <Exp>.\n\r", ch );
+	return;
+    }
+    
+    if (( victim = get_char_world ( ch, arg1 ) ) == NULL )
+    {
+      send_to_char("That Player is not here.\n\r", ch);
+      return;
+    }
+       
+    if ( IS_NPC( victim ) )
+    {
+	send_to_char( "Not on NPC's.\n\r", ch );
+	return;
+    }
+
+    if ( ch == victim )
+    {
+	send_to_char( "You may not bonus yourself.\n\r", ch );
+	return;
+    }
+
+    if (IS_IMMORTAL(victim) || victim->level >= LEVEL_IMMORTAL)
+    {
+    send_to_char("You can't bonus immortals silly!\n\r", ch);
+    return;
+    }
+
+    value = atoi( arg2 );
+
+    if ( value < -5000 || value > 5000 )
+    {
+	send_to_char( "Value range is -5000 to 5000.\n\r", ch );
+	return;
+    }
+
+    if ( value == 0 )
+    {
+	send_to_char( "The value must not be equal to 0.\n\r", ch );
+	return;
+    }
+
+    gain_exp(victim, value);
+   
+    sprintf( buf,"You have bonused %s a whopping %d experience points.\n\r",
+    		victim->name, value);
+    		send_to_char(buf, ch);
+
+    if ( value > 0 )
+    { 
+      sprintf( buf,"You have been bonused %d experience points.\n\r", value );
+      send_to_char( buf, victim );
+    }
+    else
+    {
+      sprintf( buf,"You have been penalized %d experience points.\n\r", value );
+      send_to_char( buf, victim );
+    }
+ 
+    return;
+}  
+

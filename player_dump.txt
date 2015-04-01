@@ -1,0 +1,247 @@
+#!/usr/local/bin/php -q
+<?
+# This file requires PHP. Make sure the first line points to your
+# php binary. On a MudMagic server, this is located at: /usr/local/bin/php
+
+# You can run this from a website, just remove the first line of this file
+# and then place in your public_html directory and visit the page. 
+
+# Player Dump: This file is released under public domain by Kyndig of
+# mudmagic.com. It is designed to read the contents of a player directory.
+# each file in that directory is then read and content is parsed and dumped
+# into a single HTML file. This is made for stock ROM. Read the functions
+# at the bottom to figure out how to adjust the output. 
+
+########################
+# LOCATION TO PFILE DIR
+########################
+$pfile_path = "/home/kyndig/Rom24/player";
+$html_page  = "/home/kyndig/public_html/playerlist.html";
+
+
+  /* Here we go */
+  if ($handle = opendir( $pfile_path ) ) 
+  {
+   	while (false !== ($file = readdir($handle))) 
+	{
+		if( !file_exists( $pfile_path."/".$file ) )
+		{
+			echo "file doesn't exist? $file";
+			break;
+		}
+
+		/* we're at a pfile, get the contents. we're storing the parsed array
+		 * inside another array, with the filename as the key for alphabetical
+		 * sorting
+		 */
+		$player_array[$file] = parse_pfile( $pfile_path."/".$file );
+   	}
+   	closedir($handle);
+  }
+  else
+  {
+	echo "Unable to open $pfile_path\n";
+	exit;
+  }
+
+  /*************************
+   *   page output area    *
+   *************************/
+  //print out the page header:
+  output_page_header();
+
+  //append the players now
+  reset($player_array);
+  ksort($player_array);
+
+  $total_players = $inactive_players = $active_players = 0;
+  $player_info = "";
+
+  foreach( $player_array as $profile_array )
+  {
+	if( !empty( $profile_array ) )
+	{
+		foreach( $profile_array as $name => $data )
+		{
+			$title      = $data["title"];
+			$level 	    = $data["level"];
+			$last_visit = $data["last_visit"];
+			$name	    = $data["name"];
+			$race	    = $data["race"];
+
+			$last_login =  date("F d Y H:i:s.", $last_visit );
+
+			$player_info .= "<div>
+						<b>$name</b> $title [ $race ] Last visit: $last_login
+					  </div>\n";
+	
+
+			//increment total number of players
+			$total_players++;
+
+			//last visited:
+			$now = time();
+			if( $now - $last_visit <= 1800 )
+				$active_players++;
+			else
+				$inactive_players++;
+		}
+	}
+  }
+
+  //open up our page that should have already been created with the header call above
+  $fp = fopen($html_page,"a");
+  $page_info = "There are: $total_players Total Players<br>
+		$active_players are active and $inactive_players are inactive<br><br>
+
+		Player List:<br>$player_info<br>
+		</body></html>";
+  fputs($fp, $page_info);
+  fclose($fp);
+  /*************************
+   *  end page output area *
+   *************************/
+ 
+   echo "All done! Go visit your site =)\n";
+
+/************************
+ * SUPPORTIVE FUNCTIONS
+ ************************/
+function read_pfile( $file )
+{
+	if( !file_exists( $file ) )
+	{
+		echo "$file file doesn't exist";
+		exit;
+	}
+
+	$handle = fopen($file, "r");
+	if( !$handle )
+	{
+		echo "unable to open $file\n";	
+		exit;
+	}
+	$contents = "";
+   	while (!feof($handle)) 
+	{
+       		$contents .= fread($handle, 4096);
+   	}
+        fclose($handle);	
+return $contents;
+}
+
+function parse_pfile($file)
+{
+	$contents = read_pfile($file);
+	$player_data = "";
+
+	/* bool check to make sure we don't double up on this pfile contents
+	 * We want the first occurence of "Name", "Title", etc..
+	 */
+	$bool_name = $bool_title = $bool_race = $bool_desc = $bool_level = 0;
+
+	//go thread each line now
+	$hold = explode("\n", $contents);
+	foreach( $hold as $line )
+	{
+		//seperate the identifier in this line
+		$line_split = split(" ", $line);
+		$identifier = $line_split[0];
+
+		switch( $identifier )
+		{
+			case 'Name':
+				if( !$bool_name )
+				{
+					$name = fread_string( "Name", $line );
+					$player_data["$name"]["name"] = $name;
+					$bool_name = 1;
+
+					//while here, go ahead and find out when we
+					//last logged in
+					$last_visit = date( filemtime( $file ) );
+					$player_data["$name"]["last_visit"] = $last_visit;
+				}
+			break;
+
+			case 'Levl':
+				if( !$bool_level )
+				{
+					$level = fread_number( "Levl", $line );
+					$player_data["$name"]["level"] = $level;
+					$bool_level = 1;
+				}
+			break;
+
+			case 'Desc':
+				if( !$bool_desc )
+				{
+					$description = fread_string( "Desc", $line );
+					$player_data["$name"]["description"] = $description;
+					$bool_desc = 1;
+				}
+			break;
+
+			case 'Race':
+				if( !$bool_race )
+				{
+					$race = ucwords( fread_string( "Race", $line ) );
+					$player_data["$name"]["race"] = $race;
+					$bool_race = 1;
+				}
+			break;
+
+			case 'Titl':
+				if( !$bool_title )
+				{
+					$title = fread_string( "Titl", $line );
+					$player_data["$name"]["title"] = $title;
+					$bool_title = 1;
+				}
+			break;
+		}
+		
+	}
+	if( is_array( $player_data ) )
+	{
+		return $player_data;
+	}
+return;
+}
+
+function fread_string( $identifier, $string )
+{
+	if( empty( $identifier ) )
+		return "";
+
+	return (trim( ereg_replace( "$identifier ", "", substr( $string, 0, -1 ) )));
+}
+
+function fread_number( $identifier, $string )
+{
+	if( empty( $identifier ) )
+		return "";
+	
+	return( ereg_replace("$identifier ", "", trim($string) ));
+}
+
+function output_page_header()
+{
+	global $html_page;
+
+	$fp = fopen($html_page, "w+");
+	if( !$fp )
+	{
+		echo "Unable to open the website page: $html_page\n";
+		return;
+	}
+
+	$date          = date("D M j h:i a");
+  $page_output ="<HTML>\n<HEAD>\n<TITLE>Player List</TITLE>
+		 <body bgcolor='white' text='black' link='blue' vlink='purple'>
+		 <div style='float: right;'>
+			Last Updated on $date
+		 </div>";
+  fputs($fp, $page_output);
+}
+?>

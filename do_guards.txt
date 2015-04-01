@@ -1,0 +1,281 @@
+---------------------------------------------------------------------------------------------
+Hi everyone...
+
+The function do_guards, allows the players call from help of a guard to kill their enemies,
+this snippet is thinked to avoid battles in a room that is LAW flagged, so the charmers will
+have a chance, if the pk's on your mud are a little clever will not risk to fight inside the
+city or in a place that is well knowed like a LAW room.
+---------------------------------------------------------------------------------------------
+The idea:
+
+Give more chances to the Charmers!!!
+
+If a player is attacked inside the city (Midgaard is well know as a entire LAW city), he/she can
+escape safely from the battle, killing the player that do the attack by a simple command.
+So the players will avoid to fight inside a LAW room... So the people that love to charm another 
+people will have more chances, because the Pk's will be looking for fight out of the LAW rooms.
+
+I don't know if I'm getting understanded. (My english is not so good, because my native languaje is spanish.
+so, sorry for my mistakes, and I'm a little sleepy, I've past the last 3 days programming a lot of things and
+I've sleeped a few.)
+
+Well.. the commands is self-explaning.
+---------------------------------------------------------------------------------------------
+Here we go.
+
+1.-
+
+	 Make a backup of your src folder before the installation of this snippet.
+
+2.-
+
+       merc.h
+
+       At the end of the pcdata structure add:
+
+       int			attacker;
+
+3.-
+
+	comm.c
+
+      -- void nanny --
+      Before the line that advice that a player as logged in:
+
+      wiznet("$N has left the real life.",ch,NULL,WIZ_LOGINS,WIZ_SITES,get_trust(ch));
+
+      Add:
+
+     	ch->pcdata->attacker = 0;
+
+4.-
+
+      fight.c
+
+	-- void do_murder --
+
+      Change this lines:
+
+    if (IS_NPC(ch))
+	sprintf(buf, "Help! %s is triying to murder me!",ch->short_descr);
+    else
+	sprintf( buf, "Help! %s is triying to murder me!", ch->name );
+
+      for this:
+
+    if (IS_NPC(ch))
+	sprintf(buf, "Help! %s is triying to murder me!",ch->short_descr);
+    else
+    {
+      ch->pcdata->attacker = 1;
+	sprintf( buf, "Help! %s is triying to murder me!", ch->name );
+    }
+
+    -- void stop_fighting --
+
+      Before the lines:
+
+	    fch->position	= IS_NPC(fch) ? fch->default_pos : POS_STANDING;
+	    update_pos( fch );
+      
+      Put this:
+
+          if (!IS_NPC(fch))
+          fch->pcdata->attacker = 0;
+
+5.-
+
+     interp.c
+
+     After the line: (or anywhere inside the structure)
+
+
+    { "goto",		do_goto,		POS_DEAD,	IM,	LOG_NORMAL, 1 },
+
+     Paste this:
+
+    { "guards",		do_guards,		POS_FIGHTING,	0,	LOG_NORMAL, 1 },
+
+5.5.-
+
+      interp.h
+
+      After the bottom of the file add this:
+
+	DECLARE_DO_FUN( do_guards	);
+
+6.-
+
+    In the file limbo.are make a mob called Guard, (or any name that you like).
+    and set it with a high level, a high range of hp, and a high amount of damage.
+    Because this mob will tag the char in the battle.
+
+    I've setted this mob with 10000d1+1000 hp and 1000d1+1000 damage.
+   
+
+7.-
+
+     any file .c (I'have a file where I've putted all my new commands, newcmnd.c)
+
+     Before the line:
+
+	#include "lookup.h"
+
+     Press enter once and paste this:
+
+	#define GUARDIA xxxxx  //xxxxx is the vnum of the mob named guard that you make in limbo.are
+
+     In the DECLARE_DO_FUN section, add this:
+
+	DECLARE_DO_FUN (do_shout);
+
+	----
+
+Paste this void at the end of the file:
+
+void do_guards(CHAR_DATA *ch, char *argument)
+{
+  CHAR_DATA *victim;
+  CHAR_DATA *guard;  
+  char buf[MAX_STRING_LENGTH];
+
+ if (IS_NPC(ch))
+ {
+  send_to_char ("Shut up and die!\n\r",ch);
+  return;
+ }
+
+ victim = ch->fighting;
+ guard = NULL;
+
+ if(victim == NULL)
+ {
+  send_to_char ("You don't need any assistence, you aren't fighting.\n\r",ch);
+  return;
+ }
+
+ if(IS_NPC(victim))
+ {
+  send_to_char ("How coward!! You attack a mob and then you ask for assistance?\n\r",ch);
+  return;
+ }
+
+ if(ch->pcdata->attacker == 1)
+ {
+  send_to_char ("I think that you are out of the law now.\n\r",ch);
+  return;
+ }
+
+ // This is the core of the whole thing.
+ if(!IS_SET(ch->in_room->room_flags,ROOM_LAW))
+ {
+  send_to_char ("No guards can help you fighting in this place.\n\r",ch);
+  return;
+ }
+
+/*
+   If you have a definition of ROOM_ARENA, uncomment this.
+
+ if(IS_SET(ch->in_room->room_flags,ROOM_ARENA))
+ {
+  send_to_char ("No guards can help you fighting in this place.\n\r",ch);
+  return;
+ }
+*/
+
+ sprintf( buf, "Guards, to me!");
+ do_shout(ch,buf);
+ guard = create_mobile(get_mob_index(GUARD));
+ char_to_room(guard,ch->in_room);
+ sprintf( buf, "Resist, I'm on my way!");
+ REMOVE_BIT(guard->comm, COMM_NOSHOUT);
+ do_shout(guard,buf);
+ SET_BIT(guard->comm, COMM_NOSHOUT);
+ send_to_char("A guard has arrive to assist you in this fight!\n\r",ch);
+ act("A guard arrives to help $n!",ch,NULL,NULL,TO_ROOM);
+
+ // The combat is stopped, and the guard starts to attack the outlawed.
+ stop_fighting(ch,TRUE);
+ stop_fighting(victim,TRUE);
+ check_killer( guard, victim );
+ multi_hit( guard, victim, TYPE_UNDEFINED );
+
+  return;
+}
+
+8.- (Optional part, If you don't like a lot of guards walking everywhere in your mud.)
+
+	update.c
+
+      In the DECLARE_DO_FUN section add:
+
+      DECLARE_DO_FUN (do_shout);
+
+      --------------------------
+      I've a function that update chars every second, I've putted this part there.
+      If you haven't something like that paste this in:
+      -- void mobile_update -- 
+
+      In the variable declaration section add:
+
+	   char buf[MAX_STRING_LENGTH];
+
+      
+      Before the line:
+
+     /* Wander */
+
+      Paste this:
+
+     /* Extract the guards that have been created. */ 
+      if( IS_NPC(ch) && 		   /* This check is required if you don't put this in mobile_update */
+         ch->pIndexData->vnum == xxxxx /* xxxxx = the vnum of your guard. */
+      && ch->fighting == NULL )
+      {
+ 	  act( "$n stares at the horizont, he seems to heared a call for help.", ch, NULL, NULL, TO_ROOM );
+	  sprintf( buf, "Resist, I'm on my way!");
+        REMOVE_BIT(ch->comm, COMM_NOSHOUT);
+        do_shout(ch,buf);
+        SET_BIT(ch->comm, COMM_NOSHOUT);
+ 	  act( "$n quikly goes, to help the ones that requires.", ch, NULL, NULL, TO_ROOM );
+        extract_char(ch,TRUE);
+      }
+
+
+___________________________End of the Installation._________________________________
+
+Well, posterior notes:
+
+- I've programmed this in about 10 minutes, so don't expect this to be perfect.
+
+- I've tested this in a one-to-one fight, I don't know how this will work in a group battle
+  but I supossed that the guard will kill the first member of the group (the owner of the group)
+  and then will go, and all the chars that were fighting will suffer a stop_fighting
+  (If this happens take this like a dramatism, A person dies and all the others get amazed XD ).
+
+- Feel free to change anything... (This is obvious! :))
+
+- I don't ask for any credit, but any comment or help will be gratefully readed in my email
+  or in Mudmagic and any cigarette or beer will be thanked ;)
+
+- Any upgrade or debug, post it in Mudmagic (Kyndig for the whole family XD)
+
+- If you speak spanish, take a look around Nueva Thoria MUD. XDD
+
+- This command works pretty funny if you eliminate the command recall, so your
+  players must walk, and this makes easily the encounters out of the city.
+  (I've removed the recall command in my mud, just to make the players life a whole hell)
+
+- Nothing else.
+_____________________________________________________________________________________
+
+Once again, sorry my bad english, as I told you before, I'm not so good at this languaje.
+well, I think that's all folks.
+
+
+- Jinwe, Nueva Thoria MUD Implementor, and Mud programmer.
+										  finweroman@hotmail.com
+
+May, 1st, 2005.
+
+-- It's different now that I'm poor and aging...  (Interpol, Obstacle 1).

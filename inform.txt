@@ -1,0 +1,226 @@
+From RuineR@netins.net Thu Apr  2 15:34:52 1998
+
+Hello, got a little piece of code here, inspired by the "inform"
+command from the EW-TOO talker code. If you don't know what it is,
+basically it just lets a player type inform <username> (as long as
+the name is in the player files), and the player will be informed
+when username logs on.  Pretty nice for players who have lots of
+friends on the mud. :)
+
+As always, I'm not the best tester in the world, so I can't tell
+you exactly how well it works, but what I did try worked fine. (Also 
+kinda hard to test code when you're the only person around) :). 
+Anyway, if you like it, e-mail me. If you don't, don't use it.
+Report bugs NICELY.
+
+/* act_info.c */
+Put these two functions:
+
+void checkinform(CHAR_DATA *ch)
+{
+  char buf[MAX_STRING_LENGTH];
+  DESCRIPTOR_DATA *d;
+  int x;
+
+  for (d = descriptor_list; d != NULL; d = d->next)
+  {
+    CHAR_DATA *victim;
+
+    victim = d->original ? d->original : d->character;
+
+    if (d->connected == CON_PLAYING && !IS_NPC(victim))
+    {
+      for (x = 0; x < MAX_INFORM; x++)
+      {
+        if (victim->pcdata->inform_list[x] == NULL)
+          continue;
+
+        if (!str_cmp(victim->pcdata->inform_list[x], ch->name))
+        {
+          sprintf(buf, "Inform: %s has entered the game.\n\r",
+          ch->name);  $ send_to_char(buf, victim); return;
+        }
+      }
+    }
+  }
+  return;
+}
+
+void do_inform(CHAR_DATA *ch, char *argument)
+{
+  char buf[MAX_STRING_LENGTH];
+  CHAR_DATA *victim;
+  FILE *fp;
+  char *temp_inform[MAX_INFORM];
+  char playerstr[MAX_INPUT_LENGTH];
+  int x;
+  char arg[MAX_INPUT_LENGTH];
+
+  smash_tilde(argument);
+  argument = one_argument(argument, arg);
+
+  if (IS_NPC(ch))
+   return;
+
+  if (arg[0] == '\0')
+  {
+    send_to_char("People on inform list:\n\r\n\r", ch);
+    for (x = 0; x < MAX_INFORM; x++)
+    {
+      if (ch->pcdata->inform_list[x] == NULL)
+        continue;
+
+      sprintf(buf, "%s\n\r", capitalize(ch->pcdata->inform_list[x]));
+        send_to_char(buf, ch);
+    }
+    return;
+  }
+
+  sprintf(playerstr, "%s%s", PLAYER_DIR, capitalize(arg));
+  if((fp = fopen(playerstr, "r")) == NULL)
+  {
+    sprintf(buf, "No such player: %s.\n\r", capitalize(arg));
+    send_to_char(buf, ch);
+    return;
+  }
+
+  if (ch->pcdata->inform_list[MAX_INFORM] != NULL)
+  {
+    send_to_char("You're already using the maximum number of
+    informs.\n\r", ch); return;
+  }
+
+  for (x = 0; x < MAX_INFORM; x++)
+  {
+    if (ch->pcdata->inform_list[x] == NULL)
+      break;
+
+    if (!str_cmp(arg, ch->pcdata->inform_list[x]))
+    {
+      free_string(ch->pcdata->inform_list[x]);
+      ch->pcdata->inform_list[x] = NULL;
+      sprintf(buf, "%s removed from your inform list.\n\r",
+      capitalize(arg)); send_to_char(buf, ch);
+      return;
+    }
+  }
+
+  ch->pcdata->inform_list[x] = str_dup(arg);
+  sprintf(buf, "%s added to your inform list.\n\r", capitalize(arg));
+  send_to_char(buf, ch);
+  fclose(fp);
+  return;
+}
+
+/* merc.h */
+in the PC_DATA structure, add:
+
+  char *inform_list[MAX_INFORM];
+
+and also somewhere with all the other MAX_ declarations
+add MAX_INFORM XX ... XX being the max number you want
+each player to have.
+
+/* comm.c */
+
+Find the lines:
+
+        wiznet("$N has left real life behind.",ch,NULL,
+                WIZ_LOGINS,WIZ_SITES,get_trust(ch));
+
+Add after them:
+
+  checkinform(ch);
+
+/* save.c */
+
+Find the lines:
+
+            ch->pcdata->condition[2],
+            ch->pcdata->condition[3] );
+
+Add after them:
+
+        for (pos = 0; pos < MAX_INFORM; pos++)
+        {
+          if (ch->pcdata->inform_list[pos] == NULL)
+            continue;
+
+          fprintf(fp, "Inform %s~\n", ch->pcdata->inform_list[pos]);
+        }
+
+Find the lines:
+
+     KEY( "Inco",        ch->incog_level,        fread_number( fp )); 
+     KEY( "Invi",        ch->invis_level,        fread_number( fp ));
+
+Add after them:
+
+            if (!str_cmp( word, "Inform"))
+            {
+                if (count >= MAX_INFORM)
+                {
+                    fread_to_eol(fp);
+                    fMatch = TRUE;
+                    break;
+                }
+
+                ch->pcdata->inform_list[count] = fread_string( fp );
+                count++;
+                fMatch = TRUE;
+                break;
+            }
+
+
+---
+ROM Mailing List  --  To unsubscribe mail "unsubscribe" to rom-request@rom.org
+           For help with SmartList features mail "help" to rom-request@rom.org
+From RuineR@netins.net Thu Apr  2 15:35:13 1998
+Date: Wed, 25 Feb 1998 09:16:43 +0000
+From: Josh Brittenham <RuineR@netins.net>
+To: rom@rom.org
+Subject: [Inform] Couple bug fixes
+Resent-Date: Wed, 25 Feb 1998 19:16:42 -0800 (PST)
+Resent-From: rom@rom.org
+
+Once again, I always find things after I've posted, but what else is 
+new.  Anyway...
+
+BTW: Forgot to mention to add the commands to interp.c and h, but if 
+you don't know how to do that by now, you have a problem.
+
+In save.c ... the inform_list[count] stuff.  Initialize a new 
+variable called countinf up top with count.  I forgot that alias
+was using this variable already.  Just intialize countinf = 0;
+and replace all the inform_list[count] with countinf.
+
+Also, in the act_info.c file, in the do_inform function, find the 
+lines:
+
+  for (x = 0; x < MAX_INFORM; x++)
+  {
+    if (ch->pcdata->inform_list[x] == NULL)
+      break;
+
+Change the "break" into a "continue".
+
+Then after the lines:
+
+      sprintf(buf, "%s removed from your inform list.\n\r",
+      capitalize(arg)); send_to_char(buf, ch); return;
+    }
+  }
+
+Add:
+
+  for (x = 0; x < MAX_INFORM; x++)
+  {
+    if (ch->pcdata->inform_list[x] == NULL)
+      break;
+  }
+
+That's about it.  What was happening was if you typed inform Tester, 
+and then inform Tester2.  If you typed inform Tester again, it would 
+remove that one, but then when you typed inform Tester2, it would add 
+it again, beings that it was in the 2nd number of the array.
+

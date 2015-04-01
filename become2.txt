@@ -1,0 +1,115 @@
+From: zain dirkbane <zain_dirkbane@hotmail.com>
+
+Ok, this is a nice little snippet that i would like to convert to use 
+with ROM2.4b4, it is for iDirt/ABER mud as it sits.. can someone help 
+convert it, or if you can do it all.. do it? hehe
+
+What it does is lets say your online, and you want to login as another 
+one of your characters, well, if you type: become <name>, it will allow 
+you to more less disconnect that player and login the other WITHOUT 
+logging off the mud.. example:
+
+<3054><Midgaard> become gaar
+password: gaar
+
+logging out Zain and becoming Gaar..
+
+An old voice, within your head, tells you Zain has become Gaar.
+
+<6392HP 4111MA 4260MV><G:2104 S:10211>
+<6310hp 4033ma 4218mv><318> say hold on..
+You say 'hold on..'
+
+<6392HP 4111MA 4260MV><G:2104 S:10211>
+<6310hp 4033ma 4218mv><318>
+
+THIS IS THE CODE:
+
+--START--------------------------------------------
+void
+becom (char *passwd)
+{
+  char x[128];
+  PERSONA p;
+
+  if (passwd == NULL) {
+
+    if (cur_player->polymorphed != -1 || cur_player->aliased) {
+      bprintf ("Not when aliased.");
+      return;
+    }
+    if (cur_player->writer != NULL) {
+      bprintf ("Finish whatever you're writing first!\n");
+      return;
+    }
+    if (pfighting (mynum) != -1) {
+      bprintf ("Not while fighting!\n");
+      return;
+    }
+    if (brkword () == -1) {
+      bprintf ("Become what?  Inebriated?\n");
+      return;
+    }
+    strcpy (cur_player->work2, wordbuf);
+    strcpy (cur_player->cprompt, "Password: ");
+    cur_player->no_echo = True;
+
+    bprintf ("\n\377\373\001\001Password: ");
+    push_input_handler (becom);
+  } else {
+    bprintf ("\377\374\001\001");
+    cur_player->no_echo = False;
+    pop_input_handler ();
+
+    if (!getuaf (cur_player->work2, &p)) {
+      bprintf ("No such player.\n");
+    } else if (!EQ (p.p_passwd, my_crypt (x, passwd, strlen (p.p_passwd)
++ 1))) {
+      bprintf ("Incorrect password!\n");
+    } else if (fpbns (cur_player->work2) >= 0) {
+      bprintf ("That player is allready on the game.\n");
+    } else {
+      close_plr_log ();
+      saveme ();
+      remove_entry (mob_id (mynum), &id_table);
+
+      pers2player (&p, mynum);
+      strcpy (cur_player->cprompt, cur_player->prompt);
+      mudlog ("SYSTEM: %s has BECOME %s", pname (mynum), p.p_name);
+
+      send_msg (DEST_ALL, MODE_QUIET, max (LVL_WIZARD, pvis (mynum)),
+LVL_MAX,
+  mynum, NOBODY, "&+B[&+W%s &*has &+CBECOME &+W%s&+B]\n", pname (mynum),
+p.p_name);
+      send_msg (ploc (mynum), 0, pvis (mynum), LVL_MAX, mynum, NOBODY,
+  "%s disintegrates, and reappears as %s.\n",
+  pname (mynum), p.p_name);
+
+      setpname (mynum, p.p_name);
+      fetchprmpt (mynum);
+      insert_entry (mob_id (mynum), mynum, &id_table);
+
+      bprintf ("You are now %s.\n", pname (mynum));
+      check_files ();
+
+      if (privileged_user (pname (mynum)))
+ cur_player->isawiz = True;
+
+      if (is_monitored (pname (mynum))) {
+ open_plr_log ();
+      }
+    }
+    get_command (NULL);
+  }
+}
+-----------------------------------------------END--
+
+I know i will have to declear it in interp.c and interp.h
+
+please help, as i find this really neat.. i remember there was someone 
+that posted something like if we can find him something to code, tell 
+him, cant remember who.. but here is your chance! :) hehehe
+
+later
+ZD
+

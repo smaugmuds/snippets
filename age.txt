@@ -1,0 +1,53 @@
+/**************************************************
+* One of the most useless functions ever, this    *
+* was made by Firehed of RotK, so players can     *
+* find out how long they have played for, times   *
+* connected, and their MUD age (in score anyways  *
+* but it goes in nicely here, too).  I don't need *
+* any credit for this, but if you want a help age *
+* file, just mention my name, Firehed.            *
+* Any questions to Firehed- firehed13@hotmail.com *
+* or connect to mustang.tamarisk.ab.ca port 6900  *
+**************************************************/
+/*
+MERC.H
+struct pcdata:
+ADD:
+int	timesplayed;
+
+
+COMM.C
+just before do_unread(ch,"");
+ADD:
+ch->pcdata->timesplayed ++;
+
+SAVE.C
+
+FREAD_CHAR
+under case 'T'
+	KEY( 'Tpld",		ch->pcdata->timesplayed, fread_number(fp));
+FWRITE_CHAR
+Under section for prompt:
+	fprintf( fp, "Tpld %d\n", ch->pcdata->timesplayed);
+
+INTERP.H
+DECLARE_DO_FUN( do_age		);
+
+INTERP.C
+   { "age",	do_age,		POS_SLEEPING,	0,  1,  LOG_NORMAL, 1 },
+
+Now for the function itself:
+Just stick it in any .c file, mine is in act_enter, but anywhere is fine
+*/
+
+void do_age(CHAR_DATA *ch)
+{
+    char buf[MAX_STRING_LENGTH];
+	sprintf(buf, "You are %d years old, played %d hours.\n\r",get_age(ch), (int)(ch->played)/3600);
+	send_to_char(buf,ch);
+	sprintf(buf, "You have connected to RotK %d times.\n\r",ch->pcdata->timesplayed);
+	sent_to_char(buf,ch);
+    return;
+}
+
+/* Change the RotK to whatever you feel like, most likely your MUD's initials */

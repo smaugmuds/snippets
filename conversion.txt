@@ -1,0 +1,213 @@
+/* Here is my conversion code. What it does is allows mortals to convert their hp, mana,
+and move into the other fields. You can convert mana to hp, hp to mana, move to hp. So on
+and so forth. It's really self explanatory and simple. Anyway if you find any bugs or have
+any suggestions for improvement let me know. */
+
+just add do_convert to interp.c and interp.h and you should be ready to go.
+
+
+void do_convert( CHAR_DATA *ch, char *argument )
+{
+  char arg[MSL];
+  char arg2[MSL];
+  char arg3[MSL];
+  CHAR_DATA *mob;
+  int amount;
+  int cost = 40;
+
+  for ( mob = ch->in_room->people; mob; mob = mob->next_in_room )
+  {
+       if ( IS_NPC(mob) && IS_SET(mob->act, ACT_TRAIN) )
+	   break;
+  }
+
+  if ( mob == NULL )
+  {
+      send_to_char( "You can't do that here.\n\r", ch );
+      return;
+  }
+
+  argument = one_argument( argument, arg );
+  argument = one_argument( argument, arg2 );
+  argument = one_argument( argument, arg3 );
+
+  if ( arg[0] == '\0' || arg2[0] == '\0' || arg3[0] == '\0' ) 
+  {
+      send_to_char( "Syntax: convert <amount> <type> to <type>\n\r", ch );
+      send_to_char( "Valid types are: hp mana move\n\r", ch );
+      printf_to_char( ch, "The current cost of conversion is: %d gold.\n\r", cost );
+      return;
+  }
+
+  amount = is_number(arg) ? atoi(arg) : 1;        
+
+  if ( amount < 1 || amount > 32000 )
+  { 
+      send_to_char( "Please choose a value between 1 and 32000.\n\r", ch );
+      return;
+  }
+
+  if ( !str_cmp( arg2, "hp" ) )
+  {
+      if ( !str_cmp ( arg3, "move" ) )
+      {
+          if ( ch->max_hit <= amount )
+          {
+              send_to_char( "I'm sorry you don't have enough hitpoints to make that conversion!\n\r", ch );
+              return;
+          }
+
+          if ( ch->gold < cost )
+          {
+              send_to_char( "I'm sorry you don't have enough gold!\n\r", ch );
+              return;
+          }
+
+          ch->max_hit -= amount;
+          ch->hit = ch->max_hit;
+          ch->pcdata->perm_hit -= amount;
+          ch->max_move += amount;
+          ch->move = ch->max_move;
+          ch->pcdata->perm_move += amount;
+          ch->gold -= amount;
+          printf_to_char( ch, "You convert %d hp into movement.\n\rYou have %d movement, and %d hp!\n\r", amount, ch->max_move, ch->max_hit );
+          return;
+      }
+    
+      else if ( !str_cmp ( arg3, "mana" ) )
+      {
+          if ( ch->max_hit <= amount )
+          {
+              send_to_char( "I'm sorry you don't have enough hitpoints to make that conversion!\n\r", ch );
+              return;
+          }
+     
+          if ( ch->gold < cost )
+          {
+              send_to_char( "I'm sorry you don't have enough gold!\n\r", ch );
+              return;
+          }        
+
+          ch->max_hit -= amount;
+          ch->hit = ch->max_hit;
+          ch->pcdata->perm_hit -= amount;
+          ch->max_mana += amount;
+          ch->mana = ch->max_mana;
+          ch->pcdata->perm_mana += amount;
+          ch->gold -= amount;
+          printf_to_char( ch, "You convert %d hp into mana.\n\rYou have %d mana and %d hp!\n\r", amount, ch->max_mana, ch->max_hit );
+          return;
+      }
+  }
+  
+  else if ( !str_cmp( arg2, "mana" ) )
+  {
+      if ( !str_cmp( arg3, "hp" ) )
+      {
+          if ( ch->max_mana <= amount )
+          {
+              send_to_char( "I'm sorry you don't have enough mana to make that conversion!\n\r", ch );
+              return;
+          }             
+         
+          if ( ch->gold < cost )
+          {
+              send_to_char( "I'm sorry you don't have enough gold!\n\r", ch );
+              return;
+          }        
+
+          ch->max_mana -= amount;
+          ch->mana = ch->max_mana;
+          ch->pcdata->perm_mana -= amount;
+          ch->max_hit += amount;
+          ch->hit = ch->max_hit;
+          ch->pcdata->perm_hit += amount;
+          ch->gold -= amount;
+          printf_to_char( ch, "You convert %d mana into hp.\n\rYou have %d hp and %d mana!\n\r", amount, ch->max_hit, ch->max_mana );
+          return;
+      }
+
+      else if ( !str_cmp( arg3, "move" ) )
+      {
+          if ( ch->max_mana <= amount )
+          {
+              send_to_char( "I'm sorry you don't have enough mana to make that conversion!\n\r", ch );
+              return;
+          }
+
+          if ( ch->gold < cost )
+          {
+              send_to_char( "I'm sorry you don't have enough gold!\n\r", ch );
+              return;
+          }        
+
+          ch->max_mana -= amount;
+          ch->mana = ch->max_mana;
+          ch->pcdata->perm_mana -= amount;
+          ch->max_move += amount;
+          ch->move = ch->max_move;
+          ch->pcdata->perm_move += amount;
+          ch->gold -= amount;
+          printf_to_char( ch, "You convert %d mana into move.\n\rYou have %d move and %d mana!\n\r", amount, ch->max_move, ch->max_mana );
+          return;
+      }
+  }  
+
+  else if ( !str_cmp( arg2, "move" ) )
+  {
+      if ( !str_cmp( arg3, "hp" ) )
+      {
+          if ( ch->max_move <= amount )
+          {
+              send_to_char( "I'm sorry you don't have enough movement to make that conversion!\n\r", ch );
+              return;
+          }
+
+          if ( ch->gold < cost )
+          {
+              send_to_char( "I'm sorry you don't have enough gold!\n\r", ch );
+              return;
+          }        
+
+          ch->max_move -= amount;
+          ch->move = ch->max_move;
+          ch->pcdata->perm_move -= amount;
+          ch->max_hit += amount;
+          ch->hit = ch->max_hit;
+          ch->pcdata->perm_hit += amount;
+          ch->gold -= amount;
+          printf_to_char( ch, "You convert %d movement into hp.\n\rYou have %d hp and %d movement!\n\r", amount, ch->max_hit, ch->max_move );
+          return;
+      }
+
+      else if ( !str_cmp( arg3, "mana" ) )
+      {
+          if ( ch->max_move <= amount )
+          {
+              send_to_char( "I'm sorry you don't have enough movement to make that conversion!\n\r", ch );
+              return;
+          }
+
+          if ( ch->gold < cost )
+          {
+              send_to_char( "I'm sorry you don't have enough gold!\n\r", ch );
+              return;
+          }        
+
+          ch->max_move -= amount;
+          ch->move = amount;
+          ch->pcdata->perm_move -= amount;
+          ch->max_mana += amount;
+          ch->hit = ch->max_hit;
+          ch->pcdata->perm_hit += amount;
+          ch->gold -= amount;
+          printf_to_char( ch, "You convert %d movement into mana.\n\rYou have %d mana and %d movement!\n\r", amount, ch->max_mana, ch->max_move );
+          return;
+      }
+  }
+
+  send_to_char( "Syntax: convert <amount> <type> to <type>\n\r", ch );
+  send_to_char( "Valid types are: hp, mana, move\n\r", ch );
+  return;
+}
+

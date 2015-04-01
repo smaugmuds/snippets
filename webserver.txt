@@ -1,0 +1,635 @@
+// webserver (simple times)
+
+
+class web_data;
+int web_control = 0;
+int web_desc;
+#define WEB_PORT 9697
+
+Lexi::List<web_data *>web_list;
+
+const char ENDREQUEST[5] = { 13, 10, 13, 10, 0 }; /* (CRLFCRLF) */
+#define START_REQUEST "HTTP/1."
+#define GET_REQUEST   "GET"
+
+// Yay Classing!
+class web_data() {
+	public:
+		web_data() { descriptor = 0; inbuf[0] = '\0'; incomm[0] = '\0'; init_at = current_time; host = NULL; temporary = NULL; base_url = NULL;
+			     chunk = NULL; after = NULL; }
+		~web_data() { web_list.remove_one(this); close(descriptor); free_string(host); free_string(temporary); free_string(base_url);
+			      free_string(chunk); free_string(after); }
+	private:
+		int descriptor;
+		char		inbuf		[4 * MAX_INPUT_LENGTH];    
+		char		incomm		[MAX_INPUT_LENGTH];
+		const char *    host;
+		const char *	temporary;
+		const char *	base_url;
+		const char *    chunk;
+		const char *    after;
+		time_t 		init_at;
+	public:
+		void Sendf(const char *msg, ...) {
+			va_list ap;
+			va_start(ap, msg);
+			char buf[MSL];
+			vsnprintf(buf, sizeof(buf), msg, ap);
+			va_end(ap);
+			send(descriptor, buf, strlen(buf), 0);
+			return;
+		}
+		bool read_from_web();
+		void manage_results();
+		void process_request();
+		const char *get_incomm() { return incomm; }
+		const char *get_chunk() { return chunk; }
+		const char *get_after() { return after; }
+		const char *get_host() { return host; }
+		const char *get_base() { return base_url; }
+		void header(const char *title) {
+			Sendf("<HTML><HEAD><TITLE>%s</TITLE></HEAD>\n\r",title);  
+			Sendf("<BODY BGCOLOR=\"#FFFFFF\"><B>%s</B><P>\n\r", title);
+		}
+		void footer(const char *footer) {
+			Sendf("</BODY></HTML>");
+		}
+		void unknown_page() {
+			header("404 - Page not found!");
+			Sendf("We are sorry, but the page you are looking for doesn't exist.  Nice try!");
+			footer("");
+		}
+		void format_request () {
+			char temp[MSL];   
+			temporary = str_dup (first_arg (incomm, temp, false));  
+			first_arg (temporary, temp, false);   
+			if (temp[0] == '/')    
+				chunk = str_dup (&temp[1]);  
+			else    
+				chunk = str_dup (temp);   
+			after = get_next (chunk, base_url);   
+			return;
+		}
+		const char *get_next (const char *path, char *base) {  
+			static char *buf[5];  
+			static int i;  
+			int x;   
+			if (NullString (chunk))    
+				return chunk;   
+			++i, i %= 5;   
+			buf[i] = strchr (path, '/');   
+			base[0] = NUL;  
+
+			if (!NullString (buf[i]))    {      
+				for (x = path[0] == '/' ? 1 : 0; path[x] != NUL; x++)	
+				{	  
+					if (path[x] == buf[i][0] && !str_cmp (&path[x], buf[i]))	    
+					{	      
+						base[x] = NUL;	      
+						break;	    
+					}	  
+					base[x] = path[x];	
+				}      
+				if (buf[i][0] == '/')	
+					buf[i]++;    
+			}   
+			return buf[i];
+		}
+};
+
+bool lastcolor = FALSE; 
+#define SET_WWW_FONT(buf, color) \
+do \
+{ \    
+	strcpy(buf, "<FONT color=\"" color "\">"); \
+	lastcolor = TRUE; \
+} \
+while (0); 
+
+int html_colour(char type, char *string) {	
+	char code[MIL];	char out[MSL];	
+	char *p = '\0'; 	
+	if (lastcolor == TRUE)		
+		strncpy(out, "</FONT>", MSL);	
+	else		
+		out[0] = '\0'; 	
+	switch (type)	{	
+		case '\0':		
+		break;	
+		case ' ':		
+			strncpy(code, "&nbsp;", MIL);	
+			break;	default:	
+		case '`':		
+			SET_WWW_FONT(code, "silver");		
+			break;	
+		case '4':		
+			SET_WWW_FONT(code, "navy");		
+			break;	
+		case '6':		
+			SET_WWW_FONT(code, "teal");		
+			break;	
+		case '2':		
+			SET_WWW_FONT(code, "green");		
+			break;	
+		case '5':		
+			SET_WWW_FONT(code, "purple");		
+			break;	
+		case '1':		
+			SET_WWW_FONT(code, "maroon");		
+			break;	
+		case '7':		
+			SET_WWW_FONT(code, "silver");		
+			break;	
+		case '3':		
+			SET_WWW_FONT(code, "olive");		
+			break;	
+		case '$':		
+			SET_WWW_FONT(code, "blue");		
+			break;	
+		case '^':		
+			SET_WWW_FONT(code, "cyan");		
+			break;	
+		case '@':		
+			SET_WWW_FONT(code, "lime");		
+			break;	
+		case '%':		
+			SET_WWW_FONT(code, "magenta");		
+			break;	
+		case '!':		
+			SET_WWW_FONT(code, "red");		
+			break;	
+		case '&':		
+			SET_WWW_FONT(code, "white");		
+			break;	
+		case '#':		
+			SET_WWW_FONT(code, "yellow");		
+			break;	
+		case '8':		
+			SET_WWW_FONT(code, "black");		
+			break;	
+		case '*':		
+			SET_WWW_FONT(code, "gray");		
+			break;	
+		case '-':		
+			strncpy(code, "~", MIL);		
+			break;	
+		case '=':		
+			switch (number_range(1, 14)) {
+				case 1:			
+					SET_WWW_FONT(code, "navy");			
+					break;		
+				case 2:			
+					SET_WWW_FONT(code, "teal");			
+					break;		
+				case 3:			
+					SET_WWW_FONT(code, "green");			
+					break;		
+				case 4:			
+					SET_WWW_FONT(code, "purple");			
+					break;		
+				case 5:			
+					SET_WWW_FONT(code, "maroon");			
+					break;		
+				default:		
+					case 6:			
+					SET_WWW_FONT(code, "silver");			
+					break;		
+				case 7:			
+					SET_WWW_FONT(code, "olive");			
+					break;		
+				case 8:			
+					SET_WWW_FONT(code, "blue");			
+					break;		
+				case 9:			
+					SET_WWW_FONT(code, "cyan");			
+					break;		
+				case 10:			
+					SET_WWW_FONT(code, "lime");			
+					break;		
+				case 11:			
+					SET_WWW_FONT(code, "magenta");			
+					break;		
+				case 12:			
+					SET_WWW_FONT(code, "red");			
+					break;		
+				case 13:			
+					SET_WWW_FONT(code, "white");			
+					break;		
+				case 14:			
+					SET_WWW_FONT(code, "yellow");			
+					break;		
+			}		
+			break;	
+		case '{':		
+			strncpy(code, "{", MIL);		
+			break;	
+	} 	
+	strcat(out, code); 	
+	p = out;	
+	while (*p != '\0') {		
+		*string = *p++;		
+		*++string = '\0';	
+	} 	
+	return (strlen(out));
+} 
+
+void html_colourconv(char *buffer, const char *txt){	
+	const char *point;	
+	int skip = 0;	
+	const char *end = "</FONT>"; 	
+	lastcolor = FALSE; 	
+
+	for (point = txt; *point; point++)	{
+		if (*point == '{')		
+		{			
+			point++;			
+			if (*point == '\0')				
+				point--;			
+			else				
+				skip = html_colour(*point, buffer);			
+			while (skip-- > 0)				
+				++buffer;			
+			continue;		
+		}		
+	
+		if (*point == '<') {			
+			*buffer = '&';			
+			*++buffer = 'l';			
+			*++buffer = 't';			
+			*++buffer = ';';			
+			*++buffer = '\0';			
+			continue;		
+		}		
+		if (*point == '>') {			
+
+			*buffer = '&';			
+			*++buffer = 'g';			
+			*++buffer = 't';			
+			*++buffer = ';';			
+			*++buffer = '\0';			
+			continue;		
+		}		
+
+		if (*point == '"') {
+			*buffer = '&';			
+			*++buffer = 'q';			
+			*++buffer = 'u';			
+			*++buffer = 'o';			
+			*++buffer = 't';			
+			*++buffer = ';';			
+			*++buffer = '\0';			
+			continue;		
+		}		
+
+		if (*point == '&') {			
+			*buffer = '&';			
+			*++buffer = 'a';			
+			*++buffer = 'm';			
+			*++buffer = 'p';			
+			*++buffer = '\0';			
+			continue;		
+		}		
+
+		if (*point == '\n')		{
+			*buffer = '<';			
+			*++buffer = 'b';			
+			*++buffer = 'r';			
+			*++buffer = '>';			
+			*++buffer = '\0';		
+		}		
+		*buffer = *point;		
+		*++buffer = '\0';	
+	} 	
+	if (lastcolor == TRUE)	{		
+		for (point = end; *point; point++)		{
+			*buffer = *point;
+			*++buffer = '\0';
+		}	
+	} 	
+
+	*buffer = '\0';	
+	return;
+}
+
+void send_who(web_data *web) {
+	int counter = 0;
+	header("Who is online CombatMud");
+	FOREACH(Lexi::List<CHAR_DATA *>, player_list, player_iter) {
+		CHAR_DATA *ch = (*player_iter);
+		if(ch->invis_level >0)
+			continue;
+
+		// simple.
+		web->Sendf("</br>[%d]<%s> %s %s", ch->level, class_table[ch->iclass].name, ch->name, ch->title ? ch->title : "" );
+		counter++;
+	}
+	web->Sendf("There are %d visible players on CombatMud!\n\r", counter);
+	footer("");
+	return;
+}
+
+// Sending helpfile!
+void send_help(web_data *web) {
+	int count = 0;
+	int pos = 0;
+	HELP_DATA *pHelp;
+	if(NullString(web->get_after()) {
+		web->header("Help Files");      
+		web->Sendf("<table>");      
+		for (pHelp = help_first; pHelp != NULL; pHelp = pHelp->next)	{	  
+			count++;	  
+			if (pHelp->level == -1 || pHelp->level == 0)	    {
+				const char *temp;	      
+				char wordkey[MSL]; 	      
+	
+				temp = pHelp->keyword;	      
+				while (!NullString (temp))		{		  
+					wordkey[0] = '\0';		  
+					temp = one_argument (temp, wordkey);		  
+					web->Sendf("%s<td><a href='%s'>%s</a></td>",(pos == 0) ? "<tr>" : "", HTTP_URL (HELP_URL_PREFIX "/%d", count), wordkey);
+			                if (++pos % 5 == 0) {
+					      	web->Sendf("</tr>");
+						pos = 0;		    
+					}
+				}	    
+			}	
+		}      
+		web->Sendf("</table>");      
+		web->Sendf("");  
+		web->footer("");    
+	} else {
+		char temp[MIL];       
+		pos = 0;      
+
+		for (pHelp = help_first; pHelp != NULL; pHelp = pHelp->next)	{	  
+			pos++;
+			char buf[MSL];
+			sprintf (temp, "%d", pos);	  
+			if (!str_cmp (web->get_after(), temp)) {
+				html_colourconv(buf, fix_string(pHelp->text));		// correct colour!
+		  		web->header(pHelp->keyword);	      
+				web->Sendf("<table>");	      
+				web->Sendf("<tr><td>[%d] %s<td></tr>", pHelp->level, pHelp->keyword); 	      
+				web->Sendf("<tr><td colspan=\"2\">%s</td></tr>",buf);	      
+				web->Sendf("</table>"); 	      
+				web->Sendf("");	      
+				return;
+		        }	
+		}    
+	}  
+	web->header("Can't find help");  
+	web->Sendf("<p>Can't find help %s</p>", web->get_after());  
+	web->footer("");
+	return;
+}
+
+void web_data::process_request() 
+{	    
+	/* process request */	    
+	/* are we using HTTP/1.x? If so, write out header stuff.. */	    
+	if(!strstr(incomm, GET_REQUEST)) {		
+		Sendf("HTTP/1.0 501 Not Implemented");		
+		return;	    
+	} 
+
+	format_request();
+
+	if(strstr(incomm, START_REQUEST)) {		
+		Sendf("HTTP/1.0 200 OK\n");		
+		Sendf("Content-type: text/html\n\n");	    
+	} 	    
+
+	// handle our results... To be tabled.. Someday..
+	if(strstr(chunk, "/online")) 	send_who(this);
+	else if(strstr(incomm, "/help")) send_help(this);
+	else unknown_page();  
+}
+
+bool web_data::read_from_web(){    
+	int iStart;
+	web_data *d = this;
+
+	if ( d->incomm[0] != '\0' )	
+		return TRUE;     
+
+
+	iStart = strlen(d->inbuf);    
+	if ( iStart >= sizeof(d->inbuf) - 10 )    {	
+		log_string( "%s input overflow in web processor.!", d->host );	
+		return FALSE;    
+	}     
+
+
+	for ( ; ; )    {	
+		int nRead; 	
+		nRead = read( d->descriptor, d->inbuf + iStart,	    sizeof(d->inbuf) - 10 - iStart );	
+		if ( nRead > 0 )	{	    
+			iStart += nRead;	    
+			if ( d->inbuf[iStart-1] == '\n' || d->inbuf[iStart-1] == '\r' )		
+				break;	
+		}	
+		else if ( nRead == 0 )	{	    
+			log_string( "EOF encountered on read." );	    
+			return FALSE;	
+		}	
+		else if ( errno == EWOULDBLOCK )	    
+			break;	
+		else	{
+		    	perror( "Read_from_descriptor" );	    
+			return FALSE;	
+		}    
+	}
+	d->inbuf[iStart] = '\0';    
+	return TRUE;
+}
+
+void web_data::manage_results() {
+	int i, j, k;    
+	unsigned char *p;
+
+        if ( incomm[0] != '\0' )	// already processing the web
+		return;
+
+        /*     * Look for at least one new line.     */    
+	for ( i = 0; d->inbuf[i] != '\n' && d->inbuf[i] != '\r'; i++ )    
+	{	if ( d->inbuf[i] == '\0' )	    
+			return;
+        }
+
+        /*     * Canonical input processing.     */    
+	for ( i = 0, k = 0; d->inbuf[i] != '\n' && d->inbuf[i] != '\r'; i++ )    
+	{	
+		if ( k >= MAX_INPUT_LENGTH - 2 )	{
+			write_to_descriptor( d->descriptor, "Line too long.\n\r", 0 );	    
+			write_to_descriptor( d, "Line too long.\n\r", 0 );
+			// End MCCP 	    
+			/* skip the rest of the line */	    
+			for ( ; d->inbuf[i] != '\0'; i++ )	    
+			{		
+				if ( d->inbuf[i] == '\n' || d->inbuf[i] == '\r' )		    
+				break;	    
+			}	    
+			d->inbuf[i]   = '\n';	    
+			d->inbuf[i+1] = '\0';	    
+			break;	
+		} 	
+
+		if ( d->inbuf[i] == '\b' && k > 0 )	    
+			--k;	
+		else if ( isascii(d->inbuf[i]) && isprint(d->inbuf[i]) )	    
+			d->incomm[k++] = d->inbuf[i];    
+	}
+
+        /*     * Finish off the line.     */    
+	if ( k == 0 )	
+		d->incomm[k++] = ' ';    
+	d->incomm[k] = '\0';
+
+	while ( d->inbuf[i] == '\n' || d->inbuf[i] == '\r' )	
+		i++;    
+	for ( j = 0; ( d->inbuf[j] = d->inbuf[i+j] ) != '\0'; j++ )	
+		;
+
+}
+
+void web_new( int wc ) {
+	char buf[MAX_STRING_LENGTH];    
+	web_data *web;    
+	struct sockaddr_in sock;    
+	struct hostent *from;    
+	int desc;    
+	socklen_t size;     
+	size = sizeof(sock);    
+	getsockname( wc, (struct sockaddr *) &sock, &size );    
+	if ( ( desc = accept( wc, (struct sockaddr *) &sock, &size) ) < 0 )    {	
+		perror( "web_new: accept" );	
+		return;    
+	}
+
+	#if !defined(FNDELAY)
+		#define FNDELAY O_NDELAY
+	#endif     
+
+	if ( fcntl( desc, F_SETFL, FNDELAY ) == -1 )    {	
+		perror( "web_new: fcntl: FNDELAY" );	
+		return;    
+	}
+
+	web = new web_data();
+	web->descriptor = desc;
+	web_list.push_back();
+
+	size = sizeof(sock);    
+	if ( getpeername( desc, (struct sockaddr *) &sock, &size ) < 0 )    {	
+		perror( "New_descriptor: getpeername" );	
+		dnew->host = str_dup( "(unknown)" );    
+	}    else    {	
+		/*	 
+		 * Would be nice to use inet_ntoa here but it takes a struct arg,	 
+		 * which ain't very compatible between gcc and system libraries.	 
+		 */	
+
+		int addr; 	
+		addr = ntohl( sock.sin_addr.s_addr );	
+		sprintf( buf, "%d.%d.%d.%d", ( addr >> 24 ) & 0xFF, ( addr >> 16 ) & 0xFF, ( addr >>  8 ) & 0xFF, ( addr       ) & 0xFF	    );	
+		log_string("Web Descriptor:  Sock.sinaddr:  %s", buf );	
+
+		from = gethostbyaddr( (char *) &sock.sin_addr, sizeof(sock.sin_addr), AF_INET );	
+		web->host = str_dup( from ? from->h_name : buf );    
+	}
+}
+
+// open the web-port!
+void webserver_start() {
+	extern int init_socket(int );
+	web_control = init_socket(WEB_PORT);
+	return;
+}
+
+// shutdown the webserver
+void webserver_shutdown() {
+	close(web_control);	// prevents connect attemps during shutdown.
+	FOREACH(Lexi::List<web_data *>, web_list, web_iter) {
+		web_data *web = (*web_iter);
+		delete web;
+	}
+	return;
+}
+
+// process the webserver
+void webserver_loop() {
+        static struct timeval null_time;    
+	struct timeval last_time;
+
+        fd_set in_set;
+        fd_set out_set;
+        fd_set exc_set;
+
+        FD_ZERO( &in_set  );
+	FD_ZERO( &out_set );	
+	FD_ZERO( &exc_set );
+
+	FD_SET( control, &in_set );
+
+
+	web_desc = web_control;	
+
+	FOREACH(Lexi::List<web_data*>, web_list, web_iter) {
+	{
+		web_data *web = (*web_iter);
+		web_desc = UMAX( web_desc, d->descriptor );	     
+		FD_SET( d->descriptor, &in_set  );	     
+		FD_SET( d->descriptor, &out_set );	     
+		FD_SET( d->descriptor, &exc_set );	    
+	}
+
+	if ( select( web_desc+1, &in_set, &out_set, &exc_set, &null_time ) < 0 )	{	    
+		perror( "Game_loop: select: poll" );	    
+		exit( 1 );	
+	}
+
+	if ( FD_ISSET( web_control , &in_set ) ) 	    
+		web_new( web_control );
+
+	/*	remove broken sockets.	 */	
+	FOREACH(Lexi::List<web_data*>, web_list, web_iter)	{	    
+		web_data *web = (*web_iter);   
+		if ( FD_ISSET( web->descriptor, &exc_set ) )	    {		
+			FD_CLR( web->descriptor, &in_set  );		
+			FD_CLR( web->descriptor, &out_set );		
+			delete web;
+			continue;
+		}
+
+		// purge our timed out web-descriptors.
+		if(web->init_at < current_time+400) {
+			delete web;
+			continue;
+		}
+	}
+
+	/* Process input and fire out the data*/
+	FOREACH(Lexi::List<web_data*>, web_list, web_iter)	{
+		web_data *web = (*web_iter);
+		if ( FD_ISSET( web->descriptor, &in_set ) )	    {		
+			if ( !web->read_from_web( ) ) {
+			FD_CLR( web->descriptor, &out_set );		    
+			delete web;	    
+	        	continue;		
+			}	    
+		} 
+		web->manage_results();
+	        if(strstr(web->get_incomm(), START_REQUEST ) && strstr(web->get_incomm(), ENDREQUEST))		
+			process_web(web);	    
+		else if(!strstr(web->get_incomm(), START_REQUEST ) &&  strchr(web->get_incomm(), '\n')) /* HTTP/0.9 (no ver number) */		
+			process_web(web);			    
+		else {		
+			continue; /* Don't have full request yet! */	    
+		}
+		// killinate what needs to be killinated.
+
+		delete web;
+	}
+
+	return;
+}

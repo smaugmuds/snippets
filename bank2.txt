@@ -1,0 +1,165 @@
+/* Banking system by Vir
+ * mailto:leckey@rogers.wave.ca
+ * (C)opyright 1997, Eternal Struggle MUD
+ * telnet://es.mudservices.com:4321
+ * http://es.mudservices.com/index.html
+ * Made for a SMAUG MUD Code Base.
+ * May be used by anybody providing this header stays.
+ */
+
+/* Remember to add a "balance" pointer in the char_data struct in "mud.h"
+ * Also, add ch->balance to fwrite_char and fread_char.
+ * If you have on-line player creation or remorting, add ch->balance = 0 in
+ * "load_char_obj".
+ * That's all you need to do.
+ * Enjoy!
+ */
+
+#define BANK_VNUM_1 21005 /*Change this to the vnum that you want your bank to be.*/
+
+void do_balance( CHAR_DATA *ch, char *argument )
+{
+ char arg[MAX_INPUT_LENGTH];
+ char buf[MAX_INPUT_LENGTH];
+ argument = one_argument( argument, arg );
+
+ if ( IS_NPC(ch) )
+ {
+  send_to_char( "Mobs don't have bank accounts.\n\r", ch );
+  return;
+ }
+
+ if ( IS_IMMORTAL(ch) )
+ {
+  send_to_char( "You don't need a bank account!\n\r", ch );
+  return;
+ }
+
+ if ( NOT_AUTHED(ch) )
+ {
+  send_to_char( "Huh?" );
+  return;
+ }
+
+ sprintf( buf, "Your Current Balance: %d gold pieces", ch->balance );
+ set_char_color( AT_YELLOW, ch );
+ send_to_char( buf, ch );
+ return;
+}
+
+void do_withdraw( CHAR_DATA *ch, char *argument )
+{
+ ROOM_INDEX_DATA *location;
+ char arg[MAX_INPUT_LENGTH];
+ char buf[MAX_INPUT_LENGTH];
+ int amount;
+ argument = one_argument( argument, arg );
+
+ if ( IS_NPC(ch) )
+ {
+  send_to_char( "Mobs don't have bank accounts!\n\r", ch );
+  return;
+ }
+
+ if ( NOT_AUTHED(ch) )
+ {
+  send_to_char( "Huh?", ch );
+  return;
+ }
+
+ if ( arg[0] == '\0' )
+ {
+  send_to_char( "Withdraw how much?\n\r", ch );
+  return;
+ }
+
+ if ( IS_IMMORTAL(ch) )
+ {
+  send_to_char( "You do not need a bank account!\n\r", ch );
+  return;
+ }
+
+ location = ch->in_room;
+
+ if ( !(location->vnum == BANK_VNUM_1) )
+ {
+  send_to_char( "You are not in a bank.\n\r", ch );
+  return;
+ }
+
+ if ( !is_number( arg ) )
+ {
+  send_to_char( "Withdraw how much?\n\r", ch );
+  return;
+ }
+
+ amount = atoi(arg);
+ if ( ch->balance < amount )
+ {
+  send_to_char( "Your account does not have that much gold in it!\n\r", ch );
+  return;
+ }
+ ch->gold += amount;
+ ch->balance -= amount;
+ act( AT_YELLOW, "$n withdraws some gold.", ch, NULL, NULL, TO_ROOM );
+ return;
+}
+
+void do_deposit( CHAR_DATA *ch, char *argument )
+{
+ ROOM_INDEX_DATA *location;
+ char arg[MAX_INPUT_LENGTH];
+ char buf[MAX_INPUT_LENGTH];
+ int amount;
+ argument = one_argument( argument, arg );
+
+ if ( IS_NPC(ch) )
+ {
+  send_to_char( "Mobs don't have bank accounts!\n\r", ch );
+  return;
+ }
+
+ if ( NOT_AUTHED(ch) )
+ {
+  send_to_char( "Huh?", ch );
+  return;
+ }
+
+ if ( arg[0] == '\0' )
+ {
+  send_to_char( "Deposit how much?\n\r", ch );
+  return;
+ }
+
+ if ( IS_IMMORTAL(ch) )
+ {
+  send_to_char( "You do not need a bank account!\n\r", ch );
+  return;
+ }
+
+ location = ch->in_room;
+
+ if ( !(location->vnum == BANK_VNUM_1) )
+ {
+  send_to_char( "You are not in a bank.\n\r", ch );
+  return;
+ }
+
+ if ( !is_number( arg ) )
+ {
+  send_to_char( "Deposit how much?\n\r", ch );
+  return;
+ }
+
+ amount = atoi(arg);
+ if ( ch->gold < amount )
+ {
+  send_to_char( "You don't have that much gold!\n\r", ch );
+  return;
+ }
+ ch->gold -= amount;
+ ch->balance += amount;
+ act( AT_YELLOW, "$n deposits some gold.", ch, NULL, NULL, TO_ROOM );
+ return;
+}
+

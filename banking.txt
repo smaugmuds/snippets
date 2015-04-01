@@ -1,0 +1,185 @@
+/*******************************************
+ * Banking code made by Firehed of RotK    *
+ * mustang.tamarisk.ab.ca port 6900.  Just *
+ * add the following stuff into the files  *
+ * that it says (it's pretty easy to do)   *
+ *******************************************/
+/*** SAVE.C ***/
+ /** frwite_char **/
+    if (ch->pcdata->bank != 0)
+ fprintf( fp, "Bank  %d\n", ch->pcdata->bank     ); /** fread_char **/
+  /* case 'B': */
+ KEY( "Bank",        ch->pcdata->bank,       fread_number( fp ) );
+/*** MERC.H ***/
+ /** PC_DATA **/
+int                  bank;
+/*** TABLES.C ***/
+/** in the 'const struct flag_type area_room[] =' section **/
+    {   "bank",			#,	TRUE	},
+/** replace # with a free variable **/
+/** in the 'const struct flag_type room_flags[] =' section **/
+    {	"bank",			ROOM_BANK,		TRUE	},
+
+
+/*******************************************************
+ * For this code, all you need to do is add the stuff  *
+ * below somewhere in a .c file (Mine's in act_info.c) *
+ * and just do a clean make, and you should be set :)  *
+ * Don't forget to add it into interp.c/h as level 1   *
+ *******************************************************/
+
+
+
+void do_balance ( CHAR_DATA *ch, char *argument )
+{
+    char buf[MAX_STRING_LENGTH];
+    sprintf( buf, "{GYou have {W%d{G platinum in the bank.\n\r", ch->pcdata->bank );
+    send_to_char( buf, ch );
+    return;
+}
+void do_deposit ( CHAR_DATA *ch, char *argument )
+{
+    char arg[MAX_INPUT_LENGTH];
+    char buf[MAX_STRING_LENGTH];
+    int amnt;
+
+    if (IS_NPC(ch))
+	{
+	return;
+	}
+
+    if (!IS_SET(ch->in_room->room_flags, ROOM_BANK))  
+    {
+	sprintf( buf, "But you are not in a bank.\n\r" );
+	send_to_char( buf, ch );
+	return;
+    }
+
+    one_argument( argument, arg );
+
+    if ( arg[0] == '\0' )
+    {
+	sprintf( buf, "How many coins do you wish to deposit?\n\r" );
+	send_to_char( buf, ch );
+	return;
+    }
+
+    amnt = atoi( arg );
+    
+    if ( amnt >= (ch->platinum + 1) )
+    {
+	sprintf( buf, "{R%s{G, you do not have {W%d{G coins.\n\r", ch->name, amnt );
+	send_to_char( buf, ch );
+	return;
+    }
+
+    ch->pcdata->bank += amnt;
+    ch->platinum -= amnt;
+    sprintf( buf, "{R%s{G, your account now contains: {W%d{G coins, after depositing {W%d{G coins.\n\r", ch->name, ch->pcdata->bank, amnt );
+    send_to_char(buf, ch );
+    return;
+}
+
+void do_withdraw ( CHAR_DATA *ch, char *argument )
+{
+    char arg[MAX_INPUT_LENGTH];
+    char buf[MAX_STRING_LENGTH];
+    int amnt;
+
+    if (IS_NPC(ch))
+	{
+	return;
+	}
+    if (!IS_SET(ch->in_room->room_flags, ROOM_BANK))  
+    {
+	sprintf( buf, "But you are not in a bank.\n\r" );
+	send_to_char( buf, ch );
+	return;
+  }
+
+argument = one_argument(argument, arg);
+
+    if ( arg[0] == '\0' )
+    {
+	 sprintf( buf, "How many coins do you wish to withdraw?\n\r" );
+	 send_to_char( buf, ch );
+	 return;
+    }
+
+    amnt = atoi( arg );
+    
+    if ( amnt >= (ch->pcdata->bank + 1) )
+    {
+	sprintf( buf, "{R%s{G, you do not have {W%d{G coins in the bank.\n\r", ch->name, amnt );
+	send_to_char(buf, ch );
+	return;
+    }
+
+    ch->platinum += amnt;
+    ch->pcdata->bank -= amnt;
+    sprintf( buf, "{R%s{G, your account now contains: {W%d{G coins, after depositing {W%d{G coins.\n\r", ch->name, ch->pcdata->bank, amnt );
+    send_to_char( buf, ch );
+    return;
+}
+/* This has nothing to do at all with bank, but its
+   a fun little code to get someone's attention! */
+
+
+void do_beep ( CHAR_DATA *ch, char *argument )
+{
+    CHAR_DATA *victim;
+    char arg[MAX_INPUT_LENGTH];
+    char buf[MAX_STRING_LENGTH];
+
+    if (IS_NPC(ch))
+	return;
+
+    argument = one_argument( argument, arg );
+
+    if  ( arg[0] == '\0' )
+    {
+	send_to_char( "Beep who?\n\r", ch );
+	return;
+    }
+
+    if ( !( victim = get_char_world( ch, arg ) ) )
+    {
+	send_to_char( "They are not here.\n\r", ch );
+	return;
+    }
+
+    if ( IS_NPC(victim))
+    {
+	send_to_char( "They are not beepable.\n\r", ch );
+	return;
+    }
+
+    sprintf( buf, "\aYou beep %s.\n\r", victim->name );
+    send_to_char( buf, ch );
+
+sprintf( buf, "{$BBBBBB    {^EEEEEEE {#EEEEEEE  {MPPPPP{0\n\r");
+    send_to_char( buf, victim );
+sprintf( buf, "{$BB   BB   {^EE      {#EE       {MPP  PP{0\n\r");
+    send_to_char( buf, victim );
+sprintf( buf, "{$BB    BB  {^EE      {#EE       {MPP   PP{0\n\r");
+    send_to_char( buf, victim );
+sprintf( buf, "{$BB    BB  {^EE      {#EE       {MPP   PP{0\n\r");
+    send_to_char( buf, victim );
+sprintf( buf, "{$BB   BB   {^EE      {#EE       {MPP  PP{0\n\r");
+    send_to_char( buf, victim );
+sprintf( buf, "{$BBBBBB    {^EEEEE   {#EEEEE    {MPPPPP{0\n\r");
+    send_to_char( buf, victim );
+sprintf( buf, "{$BB   BB   {^EE      {#EE       {MPP{0\n\r");
+    send_to_char( buf, victim );
+sprintf( buf, "{$BB    BB  {^EE      {#EE       {MPP{0\n\r");
+    send_to_char( buf, victim );
+sprintf( buf, "{$BB    BB  {^EE      {#EE       {MPP{0\n\r");
+    send_to_char( buf, victim );
+sprintf( buf, "{$BB   BB   {^EE      {#EE       {MPP{0\n\r");
+    send_to_char( buf, victim );
+sprintf( buf, "{$BBBBBB    {^EEEEEEE {#EEEEEEE  {MPP{0\n\r");
+    send_to_char( buf, victim );
+    sprintf( buf, "from %s.\n\r", ch->name );
+    send_to_char( buf, victim );
+    return;
+}

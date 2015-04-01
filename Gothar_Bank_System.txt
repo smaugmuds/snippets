@@ -1,0 +1,390 @@
+/* **************************************************************
+  January 25th, 1998
+  Gothar's Bank Code Version 1.2
+  1997 Copyright <* FREEWARE *>
+  If you use this code:
+     1.Keep all the credits in the code.
+     2.Use the help entry for bank
+     3.Send a bug report,any comments or ideas
+       Ian McCormick (aka Gothar)
+       mcco0055@algonquinc.on.ca
+
+  Code modded by Wiccaan
+  
+  What it does-
+  Account  - Shows the amount of gold and silver in a players account
+  Deposite - Deposite gold or silver
+  Withdraw - Withdraw gold or silver
+  
+  I take credit for the modifications that I did but the code
+  is still copywriten to Gothar sence he did the work and I
+  just simply changed it around for the way I wanted it to work.
+  
+  I just wanted to share it with everyone if they wanted it to
+  work the same way as I did. So here it is.
+  
+  -Wiccaan
+************************************************************** */
+
+1. Open Merc.h and go to the structer pc_data area.
+
+We are going to add:
+    long			gold_bank;
+    long			silver_bank;
+    
+I put them here:
+
+    char *			alias[MAX_ALIAS];
+    char *			alias_sub[MAX_ALIAS];
++   long			gold_bank;
++   long			silver_bank;
+    int				incarnations;
+    
+2. Open DB.c and go to the void clear_char area.
+
+We are going to add:
+    ch->pcdata->gold_bank = 0;
+    ch->pcdata->silver_bank = 0;
+    
+I put them here:
+
+    ch->max_move = 100;
+    ch->on = NULL;
++   ch->pcdata->gold_bank = 0;
++   ch->pcdata->silver_bank = 0;
+
+3. Open save.c and go to void fwrite_char area.
+
+Under the silver and gold write areas put this:
+    if (ch->pcdata->gold_bank > 0)
+      fprintf( fp, "Gold_bank %ld\n",ch->pcdata->gold_bank);
+    else
+      fprintf( fp, "Gold_bank %d\n", 0);
+    if (ch->pcdata->silver_bank > 0)
+	fprintf( fp, "Silv_bank %ld\n",ch->pcdata->silver_bank);
+    else
+	fprintf( fp, "Silv_bank %d\n",0);
+	
+So it should look like this where you put it:
+
+    if (ch->gold > 0)
+        fprintf (fp, "Gold %ld\n", ch->gold);
+    else
+        fprintf (fp, "Gold %d\n", 0);
+    if (ch->silver > 0)
+        fprintf (fp, "Silv %ld\n", ch->silver);
+    else
+        fprintf (fp, "Silv %d\n", 0);
+    if (ch->pcdata->gold_bank > 0)
+      fprintf( fp, "Gold_bank %ld\n",ch->pcdata->gold_bank);
+    else
+      fprintf( fp, "Gold_bank %d\n", 0);
+    if (ch->pcdata->silver_bank > 0)
+	fprintf( fp, "Silv_bank %ld\n",ch->pcdata->silver_bank);
+    else
+	fprintf( fp, "Silv_bank %d\n",0);
+    fprintf (fp, "Exp  %d\n", ch->exp);
+    
+Next go to the void fread_char area.
+
+Scroll down till you get to the case area where it says like CASE 'A': 
+We are going to add these to the following cases:
+
+In case 'G' under Key Gold add:
+   
+   KEY ("Gold_bank", ch->pcdata->gold_bank, fread_number(fp));
+   
+In case 'S' under Key Silv add:
+
+   KEY ("Silv_bank", ch->pcdata->silver_bank,  fread_number(fp));
+   
+4. Open interp.c and add these:
+
+    /* Bank Commands */
+    {"account",  do_account,  POS_STANDING, 0, LOG_NORMAL, 1},
+    {"deposit",  do_deposit,  POS_STANDING, 0, LOG_NORMAL, 1},
+    {"withdraw", do_withdraw, POS_STANDING, 0, LOG_NORMAL, 1},
+    
+I put them under the OLC commands, if you dont have OLC put them at the end
+just before the End Of List markout.
+
+
+5. Open interp.h and add these:
+(You can add these in alphabetical order with the rest of the tables or
+just put them at the end of the file. Make sure that you leave a blank line
+at the end of the file. Meaning when your done go to the end and hit enter once
+so that theres a free line at the end.)
+
+/* Bank Commands */
+DECLARE_DO_FUN( do_account		);
+DECLARE_DO_FUN( do_deposit		);
+DECLARE_DO_FUN( do_withdraw		);
+
+6. Open the make file that you use to 'make' / compile your sources.
+
+Add bank.o to the list of the files.
+
+Done!
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+All done that stuff now we get to make a new file and put this in it. This is the
+bank.c file that you need to use this system. Here ya go. Just copy and paste this
+into the new file:
+
+/**************************************************
+ * Original Code By : Gothar
+ * Rewriten by : Wiccaan
+ * Addons : None
+ * Removes : - Thief System
+ *           - Share System
+ *
+ * Contact Gothar : mcco0055@algonquinc.on.ca
+ * Contact Wiccaan : wiccaan@comcast.net
+ *
+ * Beings that this code has been rewriten
+ * by Wiccaan, Gothar may not be able to
+ * help with this.
+ * Credit goes to Gothar beings that he wrote it.
+ * Wiccaan just redid it.
+ ***************************************************/
+
+#if defined(macintosh)
+#include <types.h>
+#else
+#include <sys/types.h>
+#include <sys/time.h>
+#endif
+#include <ctype.h>
+#include <stdio.h>
+#include <time.h>
+#include <string.h>
+#include <stdlib.h>
+#include "merc.h"
+#include "recycle.h"
+
+/*
+ * These are the vnums for your bank.
+ * You can use more then one.
+ * Beings that there isnt a bank in your mud yet,
+ * Im putting a random number instead.
+*/
+
+/* Be sure to change this and add the area to your mud */
+#define ROOM_VNUM_BANK 3059
+
+/* Declare procedures that will be used */
+DECLARE_DO_FUN( do_help		);
+
+/* Now for the code */
+
+/* do_account is your balace, you can change this to do_balance if you want.
+ * if you do change it, make sure to change the tables in interp.c and .h.
+*/
+void do_account (CHAR_DATA *ch, char *argument)
+ {
+  long gold = 0; 
+  long silver = 0;
+  
+  char buf[MAX_STRING_LENGTH];
+
+  gold = ch->pcdata->gold_bank;
+  silver = ch->pcdata->silver_bank;
+  
+/* IMM's, pet's, and npc's dont need bank accounts so we will remove them */
+   if( (IS_NPC(ch) || IS_SET(ch->act,ACT_PET))
+        || (IS_IMMORTAL(ch)) )
+   {
+     send_to_char("Only players need accounts.\n\r",ch);
+     return;
+   }
+
+   if(ch->in_room != get_room_index(ROOM_VNUM_BANK))
+    {
+      send_to_char("You must be at the bank!\n\r", ch);
+    }
+   else if (ch->in_room == get_room_index(ROOM_VNUM_BANK))
+   {
+   sprintf( buf, "You have Gold: %10ld Silver: %10ld in your account.\n\r",gold, silver);
+   send_to_char(buf, ch);
+   }
+ }
+ 
+/* do_deposit is to put money in the bank */
+void do_deposit (CHAR_DATA *ch, char *argument)
+ {
+  long amount = 0;
+  char arg1[MAX_INPUT_LENGTH];
+  char arg2[MAX_INPUT_LENGTH];
+  char buf[MAX_STRING_LENGTH];
+  
+/* Remove IMM's, pet's, and npc's again */
+   if( (IS_NPC(ch) || IS_SET(ch->act,ACT_PET)) 
+        || (IS_IMMORTAL(ch)) )
+   {
+     send_to_char("Only players need a bank account.\n\r",ch);
+     return;
+   }
+   
+/* If not in bank let them know */
+   if(ch->in_room != get_room_index(ROOM_VNUM_BANK))
+    {
+      send_to_char("You must be at the bank!\n\r", ch);
+      return;
+    }
+   else /* If they are in the bank */
+    {
+      argument = one_argument( argument, arg1 );
+      argument = one_argument( argument, arg2 );
+      if (arg1[0] =='\0' || arg2[0] =='\0')
+       {
+       send_to_char("How much do you want to deposit?\n\r", ch);
+       send_to_char("Commands are:\n\r", ch);
+       send_to_char("Deposite <value> gold\n\r", ch);
+       send_to_char("Deposite <value> silver\n\r", ch);
+       return;
+       }
+       
+   if(ch->in_room == get_room_index(ROOM_VNUM_BANK))
+   {
+    if ( is_number( arg1 ) )
+     {
+      amount = atoi(arg1);
+      
+       if ( amount <= 0)
+        {
+	  send_to_char( "To deposit money, you must give money!\r\n", ch);
+	  send_to_char( "For more help type 'help bank'.\r\n", ch);
+	  return;
+	}
+	
+/* If they are depositing gold */
+	if(!str_cmp( arg2, "gold"))
+	 {
+	   if (ch->gold < amount)
+	    {
+	      send_to_char("You dont have that much gold.\n\r", ch);
+	      return;
+	    }
+	    else
+	    {
+	      ch->pcdata->gold_bank += amount;
+	      ch->gold -= amount;
+	      act("$n has deposited some gold into $s account.", ch, NULL, NULL, TO_ROOM);
+	      sprintf( buf, "You have deposited %ld Gold.\n\r   Account: %10ld.\n\r   You still hold %8ld gold.\n\r", amount, ch->pcdata->gold_bank, ch->gold);
+	      send_to_char( buf, ch);
+	      return;
+	    }
+	  }
+
+/* If they are depositing silver */
+	if(!str_cmp( arg2, "silver"))
+	 {
+	   if (ch->silver < amount)
+	    {
+	      send_to_char("You dont have that much silver.\n\r", ch);
+	      return;
+	    }
+	    else
+	    {
+	      ch->pcdata->silver_bank += amount;
+	      ch->silver -= amount;
+	      act("$n has deposited some silver into $s account.", ch, NULL, NULL, TO_ROOM);
+	      sprintf( buf , "You have deposited %ld Silver.\n\r   Account: %10ld silver.\n\r   You still hold %8ld silver.\n\r", amount, ch->pcdata->silver_bank, ch->silver);
+	      send_to_char( buf, ch);
+	      return;
+	    }
+	  }
+	}
+      }
+    }
+ return;
+}
+
+void do_withdraw (CHAR_DATA *ch, char *argument)
+{
+  long amount = 0;
+   char arg1[MAX_INPUT_LENGTH];
+   char arg2[MAX_INPUT_LENGTH];
+   char buf[MAX_STRING_LENGTH];
+
+/* Remove IMM's, pet's, and npc's again */
+    if( (IS_NPC(ch) || IS_SET(ch->act,ACT_PET))
+         || (IS_IMMORTAL(ch)) )
+     {
+       send_to_char("Only players need have a bank account.\n\r", ch);
+       return;
+     }
+     
+/* If not in bank let them know */
+    if(ch->in_room != get_room_index(ROOM_VNUM_BANK))
+     {
+       send_to_char("You must be at the bank!\n\r", ch);
+     }
+    else /* If they are in the bank */
+     {
+       argument = one_argument( argument, arg1 );
+       argument = one_argument( argument, arg2 );
+       if (arg1[0] == '\0' || arg2[0] == '\0')
+       {
+         send_to_char("How much do you want to withdraw?\n\r", ch);
+         send_to_char("Commands are:\n\r", ch);
+         send_to_char("Withdraw <value> gold\n\r", ch);
+         send_to_char("Withdraw <value> silver\n\r", ch);
+         return;
+       }
+    
+    if(ch->in_room == get_room_index(ROOM_VNUM_BANK))
+       {
+         if( is_number( arg1 ) )
+	    {
+	      amount = atoi(arg1);
+	    
+	      if ( amount <= 0 )
+	         {
+	           send_to_char("To withdraw that amount, you have to have it in the bank first.\n\r", ch);
+	           send_to_char("For more help type 'help bank'.\n\r", ch);
+	           return;
+	         }
+		 
+/* If they are withdrawing gold */
+	     if(!str_cmp( arg2, "gold"))
+	        {
+	          if (ch->pcdata->gold_bank < amount)
+	             {
+	               send_to_char("You dont have that much gold in your account.\n\r", ch);
+		       return;
+	             }
+	            else
+	             {
+	               ch->pcdata->gold_bank -= amount;
+	               ch->gold += amount;
+	               act("$n withdraws gold from $s account.\n\r", ch, NULL, NULL,  TO_ROOM);
+                       sprintf( buf, "You have withdrawn %ld Gold.\n\r   Account: %10ld gold.\n\r   You now hold: %8ld gold.\n\r", amount, ch->pcdata->gold_bank, ch->gold);
+                       send_to_char( buf, ch);
+                       return;
+	             }
+	         }
+		 
+/* If they are withdrawing silver */
+	     if(!str_cmp( arg2, "silver"))
+	        {
+	          if (ch->pcdata->silver_bank < amount)
+	             {
+	               send_to_char("You dont have that much silver in your account.\n\r", ch);
+		       return;
+	             }
+	            else
+	             {
+	               ch->pcdata->silver_bank -= amount;
+	               ch->silver += amount;
+	               act("$n withdraws silver from $s account.\n\r", ch, NULL, NULL, TO_ROOM);
+	               sprintf( buf, "You have withdrawn %ld Silver.\n\r   Account: %10ld silver.\n\r   You now hold: %8ld silver.\n\r", amount, ch->pcdata->silver_bank, ch->silver);
+	               send_to_char( buf, ch);
+	               return;
+	             }
+	        }
+	   }
+      }
+  }
+return;
+}

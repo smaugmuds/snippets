@@ -1,0 +1,91 @@
+ History 1.0 by...   Rashin of TGH2: Project X          |
+ http://tgh2.solfice.com                  <- Website    |
+ telnet://tgh.solfice.com:8500            <- Mud        |
+ langton_designs@hotmail.com		 <- Email       |
+========================================================'
+Thanks to Amnon of assault for the concept and a fix in this code.
+Amnon Kruvi (assault_htw@yahoo.com) assault.game-host.org
+
+All I ask for this snippet is that you email me any fixes,
+enhancements, or ideas.
+Directions:
+
+On tgh2:px "music" is our main channel, if you use a different
+channel, simply change any instance of music to your channel.
+
+
+
+<----act_comm.c--------
+
+--(at the top)-------->
+
+char* music1;
+char* music2;
+char* music3;
+char* music4;
+char* music5;
+char* music6;
+char* music7;
+char* music8;
+
+--(now in do_music)--->
+
+        sprintf (buf, "{W%s musics '{B%s{x'", ch->name, argument);
+        music8 = music7;
+        music7 = music6;
+        music6 = music5;
+        music5 = music4;
+        music4 = music3;
+        music3 = music2;
+        music2 = music1;
+        music1 = str_dup(buf);
+
+<----act_info.c--------
+
+--(at the bottom of the file)---->
+
+void do_history (CHAR_DATA * ch, char *argument)
+{
+    char buf[MAX_STRING_LENGTH];
+    extern char* music1;
+    extern char* music2;
+    extern char* music3;
+    extern char* music4;
+    extern char* music5;
+    extern char* music6;
+    extern char* music7;
+    extern char* music8;
+
+    send_to_char ("{r.{R======================[{W Last 8 OOCs/Musics {R]======================{r.{x\n\r", ch);
+    sprintf (buf, "{R.{W %s{x\n\r", music8);
+    send_to_char (buf, ch);
+    sprintf (buf, "{R.{W %s{x\n\r", music7);
+    send_to_char (buf, ch);
+    sprintf (buf, "{R.{W %s{x\n\r", music6);
+    send_to_char (buf, ch);
+    sprintf (buf, "{R.{W %s{x\n\r", music5);
+    send_to_char (buf, ch);
+    sprintf (buf, "{R.{W %s{x\n\r", music4);
+    send_to_char (buf, ch);
+    sprintf (buf, "{R.{W %s{x\n\r", music3);
+    send_to_char (buf, ch);
+    sprintf (buf, "{R.{W %s{x\n\r", music2);
+    send_to_char (buf, ch);
+    sprintf (buf, "{R.{W %s{x\n\r", music1);
+    send_to_char (buf, ch);
+    send_to_char ("{r.{R=================================================================={r.{x\n\r", ch);
+    return;
+}
+
+
+<----interp.c--------
+--(add it around the other channel functions)---->
+
+    {"history",     do_history,     POS_SLEEPING, 0,  LOG_NORMAL, 1},
+
+<----interp.h--------
+--(at the bottom of the file)---->
+
+DECLARE_DO_FUN( do_history		);
+
+

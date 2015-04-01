@@ -1,0 +1,92 @@
+Newbie Fact Sheet
+
+This Fact Sheet is intended to help new players of muds learn the commands and valuable information to help make the mudding experience fun and enjoyable.
+
+
+Mud Terms and Definitions:
+
+Mobile, mob = is the computer generated character that you must kill to gain experience points to level
+PC = player character, which means you are a pc
+BBL = be back later
+BRB = be right back
+AFK = away from keyboard
+Exp = experience points which you must earn by killing mobiles
+Guild = the place where you practice your skills and spells
+Trainer = the place where you may train your attributes
+Immortal = the highest level players on the mud who set the rules in the mud that you must follow.
+Implementor = the creators of the mud
+Diku Staff = creators of the original DikuMud are: Hans Staerfeldt, Katja Nyboe, Tom Madsen, 
+                                                                                  Micheal Seifert, and Sebastian Hammer
+
+ROM = creator of the ROM source code is Russ Taylor
+
+Merc 2.1 = created by Hatchet, Furey,and Kahn
+
+
+
+
+Commands in the Mud:
+
+Directions- north or "n" 
+                   south or "s"
+                   west  or "w"
+                   east   or "e"
+                 down  or "d"
+                      up  or "u"
+
+
+look = makes you look around the room you are in
+look "whatever" = will make you look and see the description of the specified target
+examine, exa "whatever" = makes you get a more detailed description of the specified room or mobile
+scan = will make you scan around your room and see what may be in a room next to you
+
+
+hitpoints, hp = your life points and if it goes to zero you will die
+mana = your mana points which allow you to use them to cast a spell or channel
+movement, mov = your movement points which allow you to be able to move, walk around
+
+equ = tells what equipment you are wearing
+inven = tells what is in your inventory
+wear "whatever" = takes whatever item is in your inventory and makes you wear it
+remove "whatever" = takes the item you are wearing and removes it to your inventory
+get "whatever" = will make you get an item that you see lying around in a room
+drop "whatever" = will make you drop the specified object in you inventory to the ground
+
+consider "name of mobile" = will let you know how powerful a mobile is compared to you
+kill "name of mobile" = will make you attack a mobile in order to kill it to gain experience points
+flee = makes you flee from a fight
+wimpy "a specified number" = will set your wimpy points in order to flee if you have that amount of hitpoints
+glance "name of mobile" = will tell you what percentage the mobile's health-hp is at
+
+You must kill mobiles to gain experience points to get to the next level.
+                    
+Score = your personal datasheet with information on your character
+Who = will tell you all visible players in the game
+Whois "name of player" = will tell you more information on the specified player character
+Where = tells you who is near you and what part of the area they are in
+Area = tells you all the available areas in the mud which you can explore
+
+Train "name of attribute"= allows you to train and increase your attributes such as: strength, intelligence, etc...
+Practice "name of spell or skill" = allows you to increase you skill or spell percentages
+Prac = shows what you may practice when typed at a guild
+Train = shows what you may train when typed at a trainer
+
+
+
+Talk Channels:
+
+You will also need to know how to talk to other players on the mud....
+
+Say "whatever" = will make you say something that can be heard only by those in the room you are in
+Tell "name of player" = will make you tell something to the specified player which only they can hear
+Gossip or Chat "whatever" = will gossip or chat whatever you specify to all players on the mud
+
+Quit = will make you quit from the mud
+Save = will make the mud save your character, some muds do not support autosave
+
+Remember mudding is fun and should always be fun.
+Also remember to abide by all the rules of the mud and be considerate of other players when using
+Talk channels like "tell" or "gossip"
+
+Newbie Fact Sheet 
+         by Kracus

@@ -1,0 +1,130 @@
+Assassinate skill for smaug 1.4a
+Hi, I hope this helps you.  It is an adaption of do_slay.
+If I can help at all let me know.  vladaar@intelos.net
+It allows for assassination choices.
+******************************************************************************
+***  This skill actually does a raw kill, therefore you will want to make the
+***  percent for success extremely low.  I made mine 35% for now.
+***  I did include a check to not allow it to be performed on immortals.
+******************************************************************************
+Vladaar
+
+Skills.c
+
+add wherever you like.
+
+void do_assassinate( CHAR_DATA *ch, char *argument )
+{
+    CHAR_DATA *victim;
+    char arg[MAX_INPUT_LENGTH];
+    char arg2[MAX_INPUT_LENGTH];
+    int percent;
+
+    argument = one_argument( argument, arg );
+    one_argument( argument, arg2 );
+    if ( arg[0] == '\0' )
+    {
+	send_to_char( "Assassinate whom?\n\r", ch );
+	return;
+    }
+
+    if ( ( victim = get_char_room( ch, arg ) ) == NULL )
+    {
+	send_to_char( "They aren't here.\n\r", ch );
+	return;
+    }
+
+    if ( ch == victim )
+    {
+	send_to_char( "Suicide is a mortal sin.\n\r", ch );
+	return;
+    }
+
+    if ( IS_IMMORTAL(victim) )
+    {
+	send_to_char( "You might make them angry if you tryed.\n\r", ch );
+	return;
+    }
+
+    if ( !str_cmp( arg2, "choke" ) )
+    {
+      act( AT_WHITE, "You wrap your meaty arms around $N's neck choking out the life.",  ch, NULL, victim, TO_CHAR    );
+      act( AT_WHITE, "$n wrapped meaty arms around your neck and choked you to death.", ch, NULL, victim, TO_VICT    );
+      act( AT_WHITE, "$n wraps meaty arms around $N's neck choking out the life.",  ch, NULL, victim, TO_NOTVICT );
+    }
+
+    else if ( !str_cmp( arg2, "poison" ) )
+    {
+      act( AT_LBLUE, "You blow posion powder in $N's face causing them to convulse as their bodies blood vessels explode.",  ch, NULL, victim, TO_CHAR    );
+      act( AT_LBLUE, "$n blew poison powder in your face, causing you to convulse as your blood vessels explode.", ch, NULL, victim, TO_VICT    );
+      act( AT_LBLUE, "$n blows poison powder in $N's face causing convulsion as $N's blood vessels explode.",  ch, NULL, victim, TO_NOTVICT );
+    }
+	else if (!str_cmp( arg2, "backstab" ) )
+	{
+      act( AT_RED, "Your backstab finds its mark between $N's shoulder blades.",  ch, NULL, victim, TO_CHAR );
+      act( AT_RED, "$n's backstab hits you square inbetween the shoulder blades, stealing your life.",  ch, NULL, victim, TO_VICT );
+      act( AT_RED, "$n backstabs $N in square inbetween the shoulder blades, stealing $N's life.",  ch, NULL, victim, TO_NOTVICT );
+     }
+    else
+	{ /*
+      act( AT_RED, "You assassinate $N.",  ch, NULL, victim, TO_CHAR );
+      act( AT_RED, "$n assassinate's you.",  ch, NULL, victim, TO_VICT );
+      act( AT_RED, "$n assassinate's $N.",  ch, NULL, victim, TO_NOTVICT );
+	  */
+		send_to_char( "What kind of assassination attemp: poison, choke, backstab?\n\r", ch );
+		return;
+	  } 
+percent = number_percent( ) - (get_curr_lck(ch) - 14) 
+	      + (get_curr_lck(victim) - 13);
+    if ( !IS_AWAKE(victim)
+      || can_use_skill( ch, percent, gsn_backstab ) )
+{
+	learn_from_success( ch, gsn_assassinate );
+	check_illegal_pk( ch, victim );
+    set_cur_char(victim);
+ 	raw_kill( ch, victim );
+}
+ else
+    {
+	learn_from_failure( ch, gsn_assassinate );
+	check_illegal_pk( ch, victim );
+    }
+    
+    return;
+    
+}
+
+In Db.c
+around line 118
+add
+
+sh_int          gsn_assassinate;
+
+around line 567
+add
+ASSIGN_GSN( gsn_assassinate,   "assassinate" );
+
+In Mud.h
+around line 2935
+add
+
+extern  sh_int  gsn_assassinate;
+
+also add
+in declarations
+
+DECLARE_DO_FUN( do_assassinate );
+
+In Tables.C
+
+add
+	if ( !str_cmp( name, "do_assassinate" ))  return do_assassinate;
+
+and its counterpart
+
+	if ( skill == do_assassinate )      return "do_assassinate";
+
+
+Good Luck,
+
+Vladaar

@@ -1,0 +1,570 @@
+/* This is my first published snippet.
+ * If you have questions, feel free to send an email
+ * to serutan@hotmail.com. 
+ *
+ * #include "std_disclaimer.h" here... back up your code,
+ * because your codebase is different than mine.
+ * If you break it, you fix it. I'll try to help
+ * if I have the time, but no guarantees.
+ *
+ * I spent quite a bit of time developing this, so if you
+ * use it, I want... hmm... a case of beer sent to my house.
+ * Preferably imported. ;) But an email or a mention in 
+ * help snippets are also nice. 
+ * 
+ * This was designed for a Rom2.4b6 codebase with ILab OLC.
+ * All the standard header and copyright stuff applies.
+ *
+ */
+
+/* Snippet Description:
+ * This snippet adds a coordinate map system to your 
+ * world, and allows you to return distances
+ * and directions.
+ * Example: You're in Tampa.are and your target is in
+ * Seattle.are. When called, the function can return
+ * something like "Your target is 2800 miles to the 
+ * Northwest." 
+ * 
+ * 1. distance.c will return direction and distance;
+ * 2. up/down is not taken into consideration. Adding a
+ *    third variable isn't a big deal, but you'll have
+ *    to use the sqrt function instead of hypot.
+ *    That's the only reason sqrt's in the file, it's not
+ *    used anywhere else in the snippet.
+ * 3. You'll change the area file, adding a n/s coordinate 
+ *    to each area. I picked the SW corner for (0,0) on my map.
+ *    negative numbers are off the map, so you'll probably
+ *    want to do something similar.
+ * 4. This was written at the area level. You'd need to
+ *    change the room structures if you wanted it to give
+ *    better data within an area than "they're nearby."
+ * 5. If you use Ivan's OLC you'll need to chance uvnum and
+ *    lvnum to max_vnum and min_vnum throughout the snippet.
+ * 6. This was the basis for a worldwide transit system and
+ *    an add on to the bounty system. Those snippets may be
+ *    posted later depending on the reaction to this one. ;)
+ *
+ * ***caveat... if you include math.h (to use hypot)
+ * and have logf defined in your code, you may 
+ * need to rename it to logf1 or some such. just fyi.
+ */
+
+------------------------------------------------------
+
+/* merc.h */
+
+//under function prototypes add:
+
+/* distance.c */
+int get_distance (CHAR_DATA *ch, CHAR_DATA *vch);
+int get_direction (int angle);
+
+//to the bottom of struct area_data add:
+    bool                linked;
+    sh_int              east_west;
+    sh_int              north_south;
+
+//Under directions, used in rooms, add:
+
+#define DIR_ENE                       6
+#define DIR_NNE                       7
+#define DIR_NNW                       8
+#define DIR_WNW                       9
+#define DIR_WSW                      10
+#define DIR_SSW                      11
+#define DIR_SSE                      12
+#define DIR_ESE                      13
+
+// define stc if you need it:
+#define stc send_to_char
+
+/* end merc.h */
+-----------------------------------------------
+
+/* db.c */
+
+// In void load_area, under pArea->empty add:
+    pArea->linked       = fread_number (fp) == 1 ? TRUE : FALSE;
+    pArea->north_south  = fread_number (fp );
+    pArea->east_west    = fread_number (fp);
+
+// In new_load_area, under pArea->area_flags = 0 add:
+    pArea->linked       = FALSE;
+    pArea->north_south  = -1;
+    pArea->east_west    = -1;
+
+// add to case 'N' 
+           case 'N':
+              KEY( "North", pArea->north_south, fread_number( fp) );
+           break;
+// add to case 'E'
+             KEY( "East", pArea->east_west,  fread_number ( fp ) );
+// add case 'L'
+           case 'L':
+            KEY("Linked", pArea->linked, fread_number (fp) == 1 ? TRUE : FALSE);
+            break;
+
+/* I hated the original do_areas, so I changed it to add the coordinate system. It doesn't include mob levels. If the area isn't linked (good for "lost" areas) it shows ??? as the coordinates. If it's off the map it doesn't show up at all, because those aren't "leveling" areas.*/
+
+void do_areas( CHAR_DATA *ch, char *argument )
+{
+    char buf[MAX_STRING_LENGTH];
+    char north[MIL];
+    char east[MIL];
+    AREA_DATA *pArea;
+
+    stc("Area               Coordinates (East,North)\n\r",ch);
+    stc("============================================\n\r",ch);
+
+    for ( pArea = area_first; pArea; pArea = pArea->next )
+    {
+	if (pArea->linked)
+	{
+	    sprintf(north,"%d",pArea->north_south);
+	    sprintf(east, "%d",pArea->east_west);
+        }
+	else
+	{
+	    sprintf(north,"?");
+	    sprintf(east,"?");
+	}
+ 	if (pArea->north_south >= 0 && pArea->east_west >= 0)
+	{
+	   sprintf(buf,"%-21s   [%s,%s]\n\r",
+		pArea->name,
+		east,
+		north);
+	   stc(buf,ch);
+	}
+     }
+    return;
+}
+
+/* end db.c */
+-------------------------------------------------
+/* olc.h */
+
+// Under the aedit prototypes add:
+
+DECLARE_OLC_FUN( aedit_linked           );
+DECLARE_OLC_FUN( aedit_north            );
+DECLARE_OLC_FUN( aedit_east             );
+
+/* end olc.h */
+--------------------------------------------------
+
+/* olc_act.c */
+
+// Aedit_show, add the following after flags:
+
+    sprintf( buf, "Linked:   [%s]\n\r", pArea->linked ? "TRUE" : "FALSE");
+    send_to_char (buf, ch);
+
+    sprintf( buf, "NS value: [%d]\n\r", pArea->north_south );
+    stc (buf,ch);
+
+    sprintf( buf, "EW value: [%d]\n\r", pArea->east_west );
+    stc (buf,ch);
+
+// Add in the same general area as aedit_show:
+
+
+AEDIT (aedit_north )
+{
+     char north[MSL];
+     AREA_DATA *pArea;
+
+     EDIT_AREA(ch, pArea);
+     argument = one_argument (argument, north);
+
+    if ( !is_number( north ) || north[0] == '\0' )
+    {
+        send_to_char( "Syntax:  north [#]\n\rThe southwest corner of the map is (0,0) so plan accordingly.\n\r", ch );
+        return FALSE;
+    }
+
+    pArea->north_south = atoi( north);
+    stc("Northern coordinate set.\n\r",ch);
+    return TRUE;
+}
+
+AEDIT (aedit_east)
+{
+ char east[MSL];
+ AREA_DATA *pArea;
+
+     EDIT_AREA(ch, pArea);
+     argument = one_argument (argument, east);
+
+    if ( !is_number( east ) || east[0] == '\0' )
+    {
+        send_to_char( "Syntax:  east [#]\n\rThe southwest corner of the map is (0,0) so plan accordingly.\n\r", ch );
+ return FALSE;
+    }
+
+    pArea->east_west = atoi (east) ;
+    stc("East-west coordinate set.\n\r",ch);
+    return TRUE;
+}
+
+
+AEDIT (aedit_linked )
+{
+    AREA_DATA *pArea;
+    char      linked[MSL];
+
+EDIT_AREA(ch, pArea);
+
+ argument = one_argument( argument, linked);
+
+if ( linked[0] == '\0' )
+ {
+ send_to_char("Valid options are True and False.",ch);
+ }
+ else
+ {
+      if ( !str_cmp ( linked, "TRUE" ) )
+         pArea->linked = TRUE;
+      else if ( !str_cmp (linked, "FALSE" ) )
+         pArea->linked = FALSE;
+      else
+         send_to_char("Valid options are True and False.",ch);
+ }
+   return TRUE;
+}
+
+
+/*end olc_act.c */
+--------------------------------------------------
+
+/* olc.c */
+
+// In const struct olc_cmd_type aedit_table[] add:
+
+    {   "linked",       aedit_linked    },
+    {   "north",        aedit_north     },
+    {   "east",         aedit_east      },
+
+// This is Galen's alist (sorted by vnum)
+// I'll use a + to indicate changes to the original
+// (just the two sprintfs for the new fields):
+
+/*****************************************************************************
+ Name:		do_alist
+ Purpose:	Normal command to list areas and display area information.
+ Called by:	interpreter(interp.c)
+ Note: I've modified this alist to sort by vnum.  I thought it would be
+ useful for builders who need to know what vnums are/are not in use. - Galen
+ ****************************************************************************/
+void do_alist( CHAR_DATA *ch, char *argument )
+{
+    char buf    [ MAX_STRING_LENGTH ];
+    AREA_DATA *pArea;
+    BUFFER *output;
+    int i,x,y;
+    
+    output = new_buf();
+    x = 32768;  /* If you have vnums higher than this, make this number bigger */
+    y = 0;
+
+ +   sprintf( buf, "[%3s] [%-17s] (%-5s-%5s) [%-10s] %3s [%-19s] [%-9s] %6s\n\r",
+       "Num", "Area Name", "lvnum", "uvnum", "Filename", "Sec", "Builders", "East,North", "Linked" );
+
+    send_to_char(buf,ch);
+
+    for ( i = area_first->vnum; i <= area_last->vnum; i++ )
+    {
+      for ( pArea = area_first; pArea; pArea = pArea->next )
+
+        if ( pArea->lvnum < x && pArea->lvnum > y )
+          x = pArea->lvnum;
+
+      y = x;
+      x = 32768;  /* If you have vnums higher than this, make this number bigger */
+
+      for ( pArea = area_first; pArea; pArea = pArea->next )
+
+        if ( y == pArea->lvnum )
+        {
++	    sprintf( buf, "[%3d] %-19.19s (%-5d-%5d) %-12.12s [%d] [%-19.19s] [%4d, %4d] %-5s\n\r",
+	       pArea->vnum,
+	       pArea->name,
+	       pArea->lvnum,
+	       pArea->uvnum,
+	       pArea->filename,
+	       pArea->security,
+	       pArea->builders,
++	       pArea->east_west,
++	       pArea->north_south,
++	       pArea->linked ? "Yes" : " " );
+	       add_buf(output,buf);
+        }
+    }
+
+    page_to_char(buf_string(output),ch);
+    return;
+}
+
+/* end olc.c */
+----------------------------------------------
+
+/* olc_save.c */
+// In save_area, between credits and end add:
+    fprintf( fp, "Linked      %d\n",         pArea->linked ? 1 : 0 );
+    fprintf( fp, "North       %d\n",         pArea->north_south);
+    fprintf( fp, "East        %d\n",         pArea->east_west);
+
+/* end olc_save.c */
+-----------------------------------------------
+/* create as distance.c */
+
+#include <math.h>
+#include "include.h"
+
+#define N_BITS 32
+#define MAX_BIT ((N_BITS + 1) / 2 - 1)
+
+unsigned long int sqrt( unsigned long int x);
+
+int get_distance (CHAR_DATA *ch, CHAR_DATA *vch)
+{
+  int distance = 0;
+  int ch_ns, ch_ew, vch_ns, vch_ew;
+
+  ch_ns = ch->in_room->area->north_south;
+  ch_ew = ch->in_room->area->east_west;
+  vch_ns = vch->in_room->area->north_south;
+  vch_ew = vch->in_room->area->east_west;
+
+
+  if (  (ch_ns != abs(ch_ns) ) ||
+	(ch_ew != abs(ch_ew) ) ||
+	(vch_ns != abs (vch_ns) ) ||
+	(vch_ew != abs (vch_ew) ) )
+  {
+     return -1;
+  }
+  /* if vch is in a no_recall room return -10...
+   * handle for this value in the calling function.
+   */
+  
+  if  ( IS_SET(vch->in_room->room_flags, ROOM_NO_RECALL))
+  {
+     return -10;
+  }
+
+  distance = hypot( (ch_ns-vch_ns), (ch_ew-vch_ew));
+
+  if (distance == 0)
+     return 1;
+  return distance;
+}
+
+int get_direction (int angle)
+{
+
+   if (angle < 22)
+      return DIR_EAST;
+   if (angle < 45)
+	return DIR_ENE;
+   if (angle < 67)
+	return DIR_NNE;
+   if (angle < 112 )
+	return DIR_NORTH;
+   if (angle < 145 )
+	return DIR_NNW;
+   if (angle < 167 )
+       return DIR_WNW;
+   if (angle < 202 )
+       return DIR_WEST;
+   if (angle < 225 )
+       return DIR_WSW;
+   if (angle < 247 )
+	return DIR_SSW;
+   if (angle < 292 )
+	return DIR_SOUTH;
+   if (angle < 315 )
+	return DIR_SSE;
+   if (angle < 337 )
+	return DIR_ESE;
+   else
+	return DIR_EAST;
+}
+
+unsigned long int sqrt(x)
+  unsigned long int x;
+  {
+  register unsigned long int xroot, m2, x2;
+
+  xroot = 0;  m2 = 1 << MAX_BIT * 2;
+  do
+    {
+    x2 = xroot + m2;
+    xroot >>= 1;
+    if (x2 <= X)
+      {
+      x -= x2;  xroot += m2;
+      }
+    }
+  while (m2 >>= 2);
+  if (xroot < x) return xroot + 1;
+  return xroot;
+  }
+
+--------------------------------------------------
+/* Can be put anywhere, I used act_info.c 
+ * Lets a spouse always know where
+ * the husband/wife is.
+ * If you don't have a structure like that,
+ * change it to make it more generic.
+ * This is more of an example than anything.
+ * You've gotta add the interp.c & h stuff too,
+ * but that's simple stuff. */
+
+void do_spousewhere (CHAR_DATA *ch, char *argument)
+{
+    CHAR_DATA       *vch;
+    int  distance, direction;
+    int  ns,ew,ch_ns,ch_ew,vch_ns, vch_ew;
+    int angle=0;
+    char buf[MSL];
+    char dir[20];
+    char dist[30];
+    float PI = 3.1415;
+
+    if ((ch->pcdata->spouse == NULL) )
+    {
+       send_to_char("But you're not married to anyone!\n\r",ch);
+       return;
+    }
+
+    if ( ( vch = get_char_world( ch, ch->pcdata->spouse ) ) == NULL )
+    {
+          send_to_char( "They aren't here.\n\r", ch );
+          return;
+    }
+
+
+  ch_ns = ch->in_room->area->north_south;
+  ch_ew = ch->in_room->area->east_west;
+  vch_ns = vch->in_room->area->north_south;
+  vch_ew = vch->in_room->area->east_west;
+
+/* a negative value in any area means it's off the map.
+ * good for the imm area, limbo, etc.
+*/
+
+  if (  (ch_ns <0 ) ||
+        (ch_ew <0 ) ||
+        (vch_ns <0) ||
+        (vch_ew <0) )
+  {
+	stc("Your spouse is too distant.",ch);
+	return;
+  }
+ 
+  ns = ch_ns - vch_ns;
+  ew = ch_ew - vch_ew;
+
+  distance = get_distance(ch,vch);
+  
+  if (distance == -10)
+  {
+	send_to_char("You can't sense your spouse.",ch);
+	return;
+  }
+
+  if (ew == 0)
+  {
+    if (ns > 0)
+       angle = 270;
+    else
+	angle = 90;
+  }
+  else
+  { 
+     angle = (int) (180/PI) * atan ((float) ns/(float) ew);
+     if  (ns >= 0 && ew > 0) 
+         angle += 180;
+     if (ns < 0 && ew > 0 )
+	angle += 180;
+     
+
+  }
+  if (angle < 0)
+     angle +=360; 
+  direction = get_direction ( angle);
+ 
+
+/* This could be put into a table*/
+
+  switch (direction)
+  {
+    case DIR_NORTH: sprintf(dir, "north");break; 
+    case DIR_EAST: sprintf(dir ,"east");break;
+    case DIR_SOUTH: sprintf(dir, "south");break;
+    case DIR_WEST:  sprintf(dir, "west");break;
+    case DIR_ENE: sprintf(dir, "east-northeast");break;
+    case DIR_NNE: sprintf(dir, "north-northeast");break;
+    case DIR_NNW: sprintf(dir, "north-northwest");break;
+    case DIR_WNW: sprintf(dir,  "west-northwest");break;
+    case DIR_WSW: sprintf(dir,  "west-southwest");break;
+    case DIR_SSW: sprintf(dir, "south-southwest");break;
+    case DIR_SSE: sprintf(dir, "south-southeast");break;
+    case DIR_ESE: sprintf(dir, "east-southeast");break;
+  }
+
+/* change the values based on the scale of your map */
+
+  if (distance <= 1 )
+  {
+	sprintf (buf, "%s is in your general vicinity.\n\r", vch->name);
+	stc (buf,ch);
+  	return;
+  }
+  else if (distance <= 2)
+	sprintf(dist, "several");
+  else if (distance <= 5)
+	sprintf(dist, "many");
+  else
+	sprintf(dist, "countless");
+ 
+
+  sprintf (buf, "%s is %s miles to the %s.\n\r",vch->name,dist, dir);
+  stc (buf,ch);
+  return;
+}
+
+/*end distance.c */
+----------------------------------------------
+
+/* include.h */
+// standard includes for just about every file, saves some typing 
+
+#if defined( macintosh )
+#include <types.h>
+#include <time.h>
+#else
+#include <sys/types.h>
+#include <errno.h>		
+#include <unistd.h>		
+#include <sys/time.h>
+#endif
+#include <ctype.h>		
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "merc.h"
+
+/* end include.h */
+--------------------------------------------------
+
+/* I *think* I got everything. It did take me some time to rip this out           
+ * of the code, so there is a chance I overlooked something important.
+ * If I did, shoot me an email so I can fix it and post a new   
+ * version. 
+ *
+ * Serutan@hotmail.com
+ * 
+ */

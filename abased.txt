@@ -1,0 +1,140 @@
+Alright this will make your races based on alignment.  First off what you need to do is have it so alignment is picked before races.  I have alignment and stats one of the first things you do on my character creation.  It may take a little work to fit into your MUD because I am converting this to Rom based on my memory.  I originally wrote this for my MUD which is based off of NiMUD code.  So if you need help converting this to Rom more then I already do then send me an email I will do what I can to help.  Anyways if you use this code please email me and let me know and also if you want to you can give me some credit*hint hint* :p although I dont require you to do that.  Please email me though if you use this so I know I am not wasting time in my life putting out code that no one uses or likes.  Anyways on with the code.  
+Also this is sloppy and prolly has some stuff in there you dont need as I forgot I had put this into snippet form(somewhat)
+so sorry if it confuses you.
+				--Anthony(Kjwah.....Daurven?)
+
+Updated note: I'm sure I could write this a cleaner way but I don't code anymore(except some web related stuff) and I'm lazy and poor
+at coding anyways.  I'm just throwing this out there because I've seen this requested quite a few times without anyone helping out.
+
+Email: the.green.machine@gmail.com
+MUDS:  No MUD..
+AIM:   Evil Death Goat
+ICQ:   I forgot my number.
+
+in merc.h
+
+#define IS_GOOD(ch)		((ch)->alignment >= 500)
+#define IS_NEUT(ch)		((ch)->alignment >= -250 && (ch)->alignment <= 250)
+#define IS_EVIL(ch)		((ch)->alignment <= -500)
+
+stick this at the bottome of pc_race_type or whatever its called for the pc races
+
+
+   bool		good;
+   bool		neut;
+   bool		evil;
+
+
+in const.c redo all your races to have TRUE and FALSE statements for each alignment.... This is what my human race looks like
+
+
+  { "human",
+    {  0,  0,  0,  0,  0 },                               
+    6,                                                    
+    0,                           			   
+    SIZE_AVERAGE,                                        
+    125,                                                    
+    17,                                                    
+	{ 1, 1, 1, 1 },					   
+	TRUE,						    /* Alignment good */
+	TRUE,						    /* Alignment neutral */
+	TRUE						    /* Alignment evil */
+  },
+
+They are all set to true because human has no restrictions...This is what my faerie race looks like
+
+  { "faerie",
+    {  0, 0,  0, 0,  0 },
+    6,
+    AFF_FLYING|AFF_DETECT_HIDDEN|AFF_INFRARED|AFF_DETECT_MAGIC, /* gets haste later on... */
+    SIZE_LARGE,
+    300,
+    25,
+	{ 1, 1, 1, 1 },
+	TRUE,
+	FALSE,
+	FALSE
+  },
+
+Good is set to true because faerie can only be good.  the rest are set to FALSE because they can't be neutral or evil..
+
+This is what my drow race looks like 
+
+  { "drow",
+    {  0, 0,  0, 0, 0 },
+    6,
+    AFF_SNEAK|AFF_DETECT_HIDDEN|AFF_INFRARED,
+    SIZE_LARGE,
+    300,
+    25,
+	{ 1, 1, 1, 1 },
+	FALSE,
+	FALSE,
+	TRUE
+  },
+
+They can only be evil because well they are for the most part an evil race....So the others are set to false while evil is set true.
+
+In my MUD I have you pick alignment before races and give a message saying that alignment depends on what race and class you can be.  I also let them know that sometimes evil races aren't always evil and good races aren't always good.  So I allow them to speak with a immortal about that if they have changed their evil ways.  They have to have a story that is IMO believable.  They also have to RP their alignment and stuff IF I do choose to change them.  Anyways here is what I did in nanny.c(comm.c) in the nanny function...
+
+This is what my con_get_alignment looks like Notice I use helpfiles to display my races.  If you can't figure out how to show your races the way stock rom does then ask someone for help.  As I said I am showing you the way I did this.  And the MUD I use uses help files for damn near everything.  Anyways when the races get shown the first time have some checks in there.  This is how mine looks. 
+
+	case CON_GET_ALIGN: {
+    		int race;
+		switch ( argument[0] ) {
+			case '1':	ch->alignment =  1000;  break;
+			case '2':	ch->alignment =   750;  break;
+			case '3':	ch->alignment =   500;  break;
+			case '4':	ch->alignment =   250;  break;
+			case '5':	ch->alignment =     0;  break;
+			case '6':	ch->alignment =  -250;  break;
+			case '7':	ch->alignment =  -500;  break;
+			case '8':	ch->alignment =  -750;  break;
+			case '9':	ch->alignment = -1000;  break;
+			default:
+				send_to_char("Sorry thats not a valid alignment.\n\r\n\r",ch);
+				show_align(ch);
+				return;
+		}
+		write_to_buffer(d,"\n\r",0);
+			for ( race = 0; race < MAX_RACE; race++ ) {
+        		do_help( ch, "NANNY_RACES" );
+	        	if (IS_GOOD(ch)) {
+				do_help(ch,"GOOD_RACES");
+				write_to_buffer(d,"\n\r\n\r",1);
+        			send_to_char( "Enter the name of your desired race: ", ch );
+// Uncomment these if you use NiMUD        DC(d) = CON_CHAR_GEN_RACE;
+                                d->connected = CON_GET_NEW_RACE
+        			break;
+			} if (IS_NEUT(ch)) {
+				do_help(ch,"NEUTRAL_RACES");
+				write_to_buffer(d,"\n\r\n\r",1);
+        			send_to_char( "Enter the name of your desired race: ", ch );
+//            			DC(d) = CON_CHAR_GEN_RACE;
+				d->connected = CON_GET_NEW_RACE 
+            			break;
+			} if (IS_EVIL(ch)) {
+				do_help(ch,"EVIL_RACES");
+				write_to_buffer(d,"\n\r\n\r",1);
+        			send_to_char( "Enter the name of your desired race: ", ch );
+//        			DC(d) = CON_CHAR_GEN_RACE;
+			        d->connected = CON_GET_NEW_RACE
+				break;
+			}
+		}
+		break;
+
+
+Alright in CON_GET_NEW_RACE add this check. You might have to change send_to_char also...
+
+            if ((race == 0)
+            || (!race_table[race].pc_race)
+	    || (IS_GOOD(ch) && !race_table[iRace].good)
+	    || (IS_NEUT(ch) && !race_table[iRace].neut)
+	    || (IS_EVIL(ch) && !race_table[iRace].evil)) {
+                send_to_char( "Invalid selection.\n\rEnter race name: ", ch );
+                return;
+            }
+
+Alright I think thats it I am not sure though.  If I did forget something major please let me know so I can update this
+asap(heh thats so fun to say).  Anyways I think thats it.  Have fun and happy MUDding.

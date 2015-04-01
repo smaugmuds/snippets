@@ -1,0 +1,234 @@
+From: "Dominic J. Eidson" <eidsod01@condor.stcloud.msus.edu>
+Cc: ROM Mailing List <rom@rom.org>
+
+On Tue, 22 Jul 1997, James Seldon wrote:
+
+> Has anyone successfully coded an "ignore" command to ignore certain
+> players?  I'm trying to think of an EASY way to do this so that players
+> can ignore EVERYTHING a player does/says/gossip etc etc.  Anyone got ideas
+> on this?
+
+Hmm... our mud does have a forget and remember command... these 
+work he same way as a ignore and unignore command... however it only 
+ignores a players tells and global channels, but I am sure it kan be 
+modified to include says and emotes.
+
+here are the functions... (add these to an appropriate .c - file, ours 
+are in 'forget.c'
+
+
+void do_forget(CHAR_DATA *ch, char *argument)
+{
+    CHAR_DATA *rch;
+    char arg[MAX_INPUT_LENGTH],buf[MAX_STRING_LENGTH];
+    DESCRIPTOR_DATA *d;
+    int pos;
+    bool found = FALSE;
+
+    if (ch->desc == NULL)
+	rch = ch;
+    else
+	rch = ch->desc->original ? ch->desc->original : ch;
+
+    if (IS_NPC(rch))
+	return;
+
+    smash_tilde( argument );
+
+    argument = one_argument(argument,arg);
+    
+    if (arg[0] == '\0')
+    {
+	if (rch->pcdata->forget[0] == NULL)
+	{
+	    send_to_char("You are not forgetting anyone.\n\r",ch);
+	    return;
+	}
+	send_to_char("You are currently forgetting:\n\r",ch);
+
+	for (pos = 0; pos < MAX_FORGET; pos++)
+	{
+	    if (rch->pcdata->forget[pos] == NULL)
+		break;
+
+	    sprintf(buf,"    %s\n\r",rch->pcdata->forget[pos]);
+	    send_to_char(buf,ch);
+	}
+	return;
+    }
+
+    for (pos = 0; pos < MAX_FORGET; pos++)
+    {
+	if (rch->pcdata->forget[pos] == NULL)
+	    break;
+
+	if (!str_cmp(arg,rch->pcdata->forget[pos]))
+	{
+	    send_to_char("You have already forgotten that person.\n\r",ch);
+	    return;
+	}
+    }
+
+    for (d = descriptor_list; d != NULL; d = d->next)
+    {
+	CHAR_DATA *wch;
+
+ 	if (d->connected != CON_PLAYING || !can_see(ch,d->character))
+	    continue;
+	
+	wch = ( d->original != NULL ) ? d->original : d->character;
+
+ 	if (!can_see(ch,wch))
+	    continue;
+
+	if (!str_cmp(arg,wch->name))
+	{
+	    found = TRUE;
+	    if (wch == ch)
+	    {
+		send_to_char("You forget yourself for a moment, but it passes.\n\r",ch);
+		return;
+	    }
+	    if (wch->level >= LEVEL_IMMORTAL)
+	    {
+		send_to_char("That person is very hard to forget.\n\r",ch);
+		return;
+	    }
+	}
+    }
+
+    if (!found)
+    {
+	send_to_char("No one by that name is playing.\n\r",ch);
+	return;
+    }
+
+    for (pos = 0; pos < MAX_FORGET; pos++)
+    {
+	if (rch->pcdata->forget[pos] == NULL)
+	    break;
+     }
+
+     if (pos >= MAX_FORGET)
+     {
+	send_to_char("Sorry, you have reached the forget limit.\n\r",ch);
+	return;
+     }
+  
+     /* make a new forget */
+     rch->pcdata->forget[pos]		= str_dup(arg);
+     sprintf(buf,"You are now deaf to %s.\n\r",arg);
+     send_to_char(buf,ch);
+}
+
+void do_remember(CHAR_DATA *ch, char *argument)
+{
+    CHAR_DATA *rch;
+    char arg[MAX_INPUT_LENGTH],buf[MAX_STRING_LENGTH];
+    int pos;
+    bool found = FALSE;
+ 
+    if (ch->desc == NULL)
+	rch = ch;
+    else
+	rch = ch->desc->original ? ch->desc->original : ch;
+ 
+    if (IS_NPC(rch))
+	return;
+ 
+    argument = one_argument(argument,arg);
+
+    if (arg[0] == '\0')
+    {
+	if (rch->pcdata->forget[0] == NULL)
+	{
+	    send_to_char("You are not forgetting anyone.\n\r",ch);
+	    return;
+	}
+	send_to_char("You are currently forgetting:\n\r",ch);
+
+	for (pos = 0; pos < MAX_FORGET; pos++)
+	{
+	    if (rch->pcdata->forget[pos] == NULL)
+		break;
+
+	    sprintf(buf,"    %s\n\r",rch->pcdata->forget[pos]);
+	    send_to_char(buf,ch);
+	}
+	return;
+    }
+
+    for (pos = 0; pos < MAX_FORGET; pos++)
+    {
+	if (rch->pcdata->forget[pos] == NULL)
+	    break;
+
+	if (found)
+	{
+	    rch->pcdata->forget[pos-1]		= rch->pcdata->forget[pos];
+	    rch->pcdata->forget[pos]		= NULL;
+	    continue;
+	}
+
+	if(!strcmp(arg,rch->pcdata->forget[pos]))
+	{
+	    send_to_char("Forget removed.\n\r",ch);
+	    free_string(rch->pcdata->forget[pos]);
+	    rch->pcdata->forget[pos] = NULL;
+	    found = TRUE;
+	}
+    }
+
+    if (!found)
+	send_to_char("No one by that name is forgotten.\n\r",ch);
+}
+
+then, in merc.h:
+
+
+#define    MAX_FORGET	5
+
+and add this to struct  pc_data:
+
+    char *		forget[MAX_FORGET];
+
+in act_comm.c, the global channel funcs, add:
+
+/* previous code */
+
+        if ( d->connected == CON_PLAYING &&
+             d->character != ch &&
+             !IS_SET(victim->comm,COMM_NOGOSSIP) &&
+             !IS_SET(victim->comm,COMM_QUIET) )
+	{
+/* add/change the following */
+            for (pos = 0; pos < MAX_FORGET; pos++)
+	    {
+                if (victim->pcdata->forget[pos] == NULL)
+                    break;
+                if (!str_cmp(ch->name,victim->pcdata->forget[pos]))
+                    found = TRUE; 
+            }
+            if (!found)
+	    {
+                act_new( "$n gossips '{B$t{x'{x",
+                    ch,argument, d->character, TO_VICT,POS_SLEEPING );
+             }
+/* end add */
+	}
+
+/* rest of code */
+
+I am not sure how to change this to handle says and emotes, but I hope 
+this will help you on your way.
+
+
+Dominic J. Eidson
+IMP - The Infinite Point
+      (hub.eden.com:6000)
+
+Dominic J. Eidson                  "Baruk Khazad! Khazad ai-menu!" - Gimli
+---------------------------------------------------------------------------
+    E-mail:                        eidsod01@condor.stcloud.msus.edu
+
+

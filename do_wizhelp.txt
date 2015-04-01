@@ -1,0 +1,51 @@
+/**********************************************
+ *
+ * change stc to send_to_char if you have to...
+ *
+ *
+ *
+ */
+void do_wizhelp(CHAR_DATA *ch,char *argument) {
+    char buf[MSL]; /*MSL = MAX_STRING_LENGTH*/
+    char color;
+    col = 0;
+    lev_old = 0;
+  /*lev_new = 0;*/
+    int cmd,col,lev,/*lev_new,*/lev_old;
+
+    for(lev = MAX_LEVEL; lev >= LEVEL_IMMORTAL && lev <= MAX_LEVEL; lev--) {
+       switch(lev) {
+        case CODER: color='w'; break; //add color where 'w' is..
+        case HDIMM: color='w'; break;
+        case HDBLD: color='w'; break;
+        case QUEST: color='w'; break;
+        case CHIEF: color='w'; break;
+        case POLIC: color='w'; break;
+        case FORMN: color='w'; break;
+        case BUILD: color='w'; break;
+        case NWBLD: color='w'; break;
+        case HLPER: color='w'; break;
+           default: color='x'; break; }
+             for(cmd = 0; cmd_table[cmd].name[0] != '\0'; cmd++) {
+                if((cmd_table[cmd].level >= LEVEL_IMMORTAL
+                  && cmd_table[cmd].level <= get_trust(ch)
+                  && cmd_table[cmd].level == lev
+                  && cmd_table[cmd].show)) {
+                    if(lev != lev_old) {
+                      if(col %5 != 0)
+                        stc("\r\n",ch);
+                        sprintf(buf,"{wLevel [{%c%d] {x",color,lev);
+                        stc(buf,ch);
+                        lev_old = lev;
+                        col = 1; }
+                        sprintf(buf,"{w%-12s{x",cmd_table[cmd].name);
+     if(col %5 == 0) {
+       stc("            ",ch);
+       col++; }
+       stc(buf,ch);
+   if(++col %5 == 0) {
+     stc("\r\n",ch); } } } }
+ if(col %5 != 0)
+   stc("\r\n",ch);
+   return; }
+

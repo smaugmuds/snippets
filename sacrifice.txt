@@ -1,0 +1,42 @@
+in ACT_OBJ.C:
+
+find do_sacrifice, and look for this bit of code -
+
+
+    if ( !IS_NPC( ch ) && ch->pcdata->deity && ch->pcdata->deity->name[0] != '\0' )
+    {
+        strcpy( name, ch->pcdata->deity->name );
+    }
+    else if ( !IS_NPC( ch ) && IS_GUILDED(ch) && sysdata.guild_overseer[0] != '\0' )
+    {
+        strcpy( name, sysdata.guild_overseer );
+    }
+    else if ( !IS_NPC( ch ) && ch->pcdata->clan && ch->pcdata->clan->deity[0] != '\0' )
+    {
+        strcpy( name, ch->pcdata->clan->deity );
+    }
+    else
+    {
+        strcpy( name, "Thoric" );
+    }
+
+
+This is the part that adds the name of the deity who gives the character one gold coin
+for the sacrifice. The part we are interested in is the part that causes it to default
+to 'Thoric'. Replace that else statement with this -
+
+
+
+    else
+    {
+        static char * god_name_table [ ] =
+        {
+                "Adam", "Bob", "Charlie", "etc",
+        };
+        strcpy(name, god_name_table[number_range(0,3)]);
+    }
+
+
+Of course, you will want to replace those names with any deities you wish (presumably
+with names from your own mud). Remember to replace the arguments passed to number_range
+with the correct numbers, matching the number of deities you plug into this block. Enjoy.

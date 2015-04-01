@@ -1,0 +1,76 @@
+From: rimsky@teleport.com
+	
+Well, one way to get by this... write some code so that the MUD
+itself can execute this function, and then pipe the output to a file.
+Then, have some sort of function that will let you view this file from the
+MUD. That way, the program doesn't get bogged down more than one time
+every... say hour or however often you want the file to be updated. You
+could also make a command that will update the file manually, if you just
+added some items, etc. 
+
+	In the end it may mean a bit of work for you, but I'm sure your
+users would be much happier with you ;-) Not to mention you could extend
+the use of the 'file saving' function, and use it to create better logs
+than the standard ROM/Merc/Diku/blah ones where basically you are sending
+the message to stdout or wherever and just saving it all in one big file.
+For example... this is a log() function that I use, with comments added
+for your reading enjoyment ;-) It SHOULD be self-explanatory for the most
+part ;-)
+
+	To call the log() function, just add: 
+
+	log("name-of-logfile", "Text to go in log file");
+
+	Maybe this will give someone some inspiration or something.... In
+any case Merry Christmas everyone ;-)
+
+	~SamMaEl
+
+-------- begin log() function ----------
+
+/* log errors and various other things to a file */
+
+void            log(char *file, char *string)
+{
+   int             fd, length;
+
+   /* this is relative to where your MUD lives. For instance, my logs
+      on my private system are at /home/rom/mud/logs, where ~/mud is the
+      directory that holds all of the mud's files. */
+
+   sprintf(stack, "logs/%s.log", file);
+
+   /* these should be defined by your system... they're the bits that will
+      be set for the file's file permissions. If you're using DOS or Win95
+      or some god-awful OS like that, replace the sprintf() above with:
+      sprintf(stack, "logs\\%s.log", file); and the call to open() below
+      to: fd = open(stack, O_CREAT | O_WRONLY); Or, you can write some
+      preprocessor directives to choose which to use, if you're interested
+      in portability. I for one don't need a Win95 system to test on,
+      since I'm running NetBSD/mac68k on my Mac IIci ;-) -- end OS rant */
+
+   fd = open(stack, O_CREAT | O_WRONLY | O_SYNC, S_IRUSR | S_IWUSR);
+   length = lseek(fd, 0, SEEK_END);
+
+   /* this bit will turn over your log file(s) if they go over MAX_LOG
+      bytes. */
+
+   if (length > MAX_LOG)
+   {
+      close(fd);
+      fd = open(stack, O_CREAT | O_WRONLY | O_SYNC | O_TRUNC, S_IRUSR | S_IWUSR);
+   }
+  
+   /* sys_time is a function that returns the real time, formatted like:
+       05:24:52 - 12/22/97 in my program's case */
+
+   sprintf(stack, "%s - %s\n", sys_time(), string);
+
+   /* you can set this to be TRUE (a global for me == 1) to turn off
+      logging */
+
+   if (NO_LOGS == TRUE)
+      printf(stack);
+   write(fd, stack, strlen(stack));
+   close(fd);
+}

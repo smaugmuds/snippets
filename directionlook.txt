@@ -1,0 +1,126 @@
+/* This code was made originally for MND mud.  Created by Muerte/Ao and Lathander of MND */
+/* Please e-mail code@mudsanddragons.com if you use this, just so we know if people are  */
+/* benefited by our releases                                                             */
+/* Some credit somewhere in a HELP would be appreciated, but not required                */
+
+IN ACT_INFO.C
+Find:
+    /* 'look direction' */
+    if (pexit->description != NULL && pexit->description[0] != '\0')
+    {
+        send_to_char(pexit->description, ch);
+    }
+
+And replace the following:
+    /* 'look direction' */
+    if ((pexit = ch->in_room->exit[door]) == NULL)
+    {
+        send_to_char("Nothing special there.\n\r", ch);
+        return;
+    }
+
+    if (pexit->description != NULL && pexit->description[0] != '\0')
+        send_to_char(pexit->description, ch);
+    else
+        send_to_char("Nothing special there.\n\r", ch);
+
+    if (pexit->keyword != NULL
+        && pexit->keyword[0] != '\0' && pexit->keyword[0] != ' ')
+
+WITH:
+   /* look direction written by Muerte/Ao and Lathander of MND */
+    if ((pexit = ch->in_room->exit[door]) == NULL)
+    {
+        send_to_char("Nothing special there.\n\r", ch);
+        return;
+    }
+           
+    if (pexit->description != NULL && pexit->description[0] != '\0')
+    {
+        send_to_char(pexit->description, ch);
+    }
+    else 
+        if (IS_SET(pexit->exit_info, EX_CLOSED))
+        {
+            act("The $d door is closed.", ch, NULL, dir_name[door], TO_CHAR);
+            return;
+        }
+        printf_to_char(ch, "To the %s you see... %s \n\r%s \n\r",
+        dir_name[door], pexit->u1.to_room->name, pexit->u1.to_room->description);
+        show_list_to_char(pexit->u1.to_room->contents, ch, FALSE, FALSE);
+        show_char_to_char(pexit->u1.to_room->people, ch);
+        display_exits(ch, TRUE, pexit->u1.to_room->vnum);
+        
+    if (pexit->keyword != NULL
+        && pexit->keyword[0] != '\0' && pexit->keyword[0] != ' ')
+
+
+ADD THIS AT THE BOTTOM.
+/*
+ * Thanks to Zrin for auto-exit part. Written/Modified do_exit by Lathander of MND.
+ */
+void display_exits(CHAR_DATA * ch, bool fAuto, int room_vnum)
+{
+    extern char *const dir_name[];
+    char buf[MAX_STRING_LENGTH];
+    EXIT_DATA *pexit;
+    bool found;
+    int door;
+    ROOM_INDEX_DATA *target_room;
+            
+    if (fAuto)  
+        sprintf(buf, "{R[Exits:");
+    else if (IS_IMMORTAL(ch))
+        sprintf(buf, "Obvious exits from room %d:\n\r", room_vnum);
+    else
+        sprintf(buf, "Obvious exits:\n\r");
+                    
+    target_room = get_room_index(room_vnum);
+    found = FALSE;  
+    for (door = 0; door <= 9; door++)
+    {
+        if ((pexit = target_room->exit[door]) != NULL
+            && pexit->u1.to_room != NULL
+            && can_see_room(ch, pexit->u1.to_room)
+            && !IS_SET(pexit->exit_info, EX_CLOSED))
+        {
+            found = TRUE;
+            if (fAuto)
+            {  
+                strcat(buf, " ");
+                strcat(buf, dir_name[door]);
+            }
+            else
+            {
+                sprintf(buf + strlen(buf), "%-5s - %s{x",
+                        capitalize(dir_name[door]),
+                        room_is_dark(pexit->u1.to_room)
+                        ? "Too dark to tell" : pexit->u1.to_room->name);
+                if (IS_IMMORTAL(ch))
+                    sprintf(buf + strlen(buf),
+                            " (room %d)\n\r{x", pexit->u1.to_room->vnum);
+                else
+                    sprintf(buf + strlen(buf), "\n\r{x");
+           }
+        }
+    }
+            
+    if (!found)
+        strcat(buf, fAuto ? " none" : "None.\n\r");
+            
+    if (fAuto) 
+        strcat(buf, "]\n\r{x");  
+                
+    send_to_char(buf, ch);
+    return;
+}
+
+MAKE CLEAN AND COPYOVER/REBOOT. THIS IS JUST A FIRST DRAFT OF THIS, AND THERE WILL BE
+SOME CHANGES IN THE FUTURE. WHEN YOU 'LOOK DIRECTION' IT WILL SHOW YOU EVERYTHING THAT
+IS IN THAT LOCATION.  
+
+ENJOY,
+
+STAFF OF MND MUD
+http://www.mudsanddragons.com
+telnet://mudsanddragons.com:4000

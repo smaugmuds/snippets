@@ -1,0 +1,169 @@
+/*This is a replacement for the stock
+ *rom log system.
+ *This takes awhile todo.  Because all your log_string calls must be changed.
+ *is partial based of the DBA released log-system.  Its very pretty.
+ *if you don't have file_open/file_close replace those calls with fopen/fclose
+ *
+ *Once you've got all of the bellow in your code,  you have to then go through
+ *all your code, and all your calls to log_string must be altered.
+ *Here are afew examples of what it should look like:
+ 		log_string(LOG_BUG,"Could not open " DISABLED_FILE " for writing");
+ 		log_string(LOG_CONNECT,"%s@%s new player.", d->character->name, d->host );
+ 		log_string(LOG_GAME,"Fixing Exits");
+ 		
+ *You have to chose the log-type from the following list bellow.  All of them are infact used.
+ *CRIT ofcourse i use for when the mud is about to be terminated from an un-friendly situation
+ *ERR is used for when there are in-mud errors that are big, but not big enough to crash.
+ *bug is for all the bug/bugf calls to be replaced with (this was fun for me todo by the way)
+ *SECURITY is obvious, bad passwords, security related commands, that sort of deal.
+ *Connect is another obvious one, for logging all new connections.
+ *Game is for all misc game logs.
+ *and command is for commands.
+ *Very simple.  Though time consuming to go through all the code replacing the log_strings/bug/bugf's
+ *its just big.  But it compresses all the logging systems into 1 logging system.
+ *For those of you whom use logf, this allows you to replace those logf's with your log_string
+ *This is a very fun system.  I'm very proud of it.
+ *
+ *Ontop of converting all the logs into 1 function.  It also names the log-files after the month/day/year
+ *so 08-12-03.security, it breaks the logs up into seperate files.  Keeping them seperate, making it easier
+ *to read, This is also great, because you don't have to use your startup-scripts log anymore, as its all done
+ *internaly.
+ *
+ *   This code was developed for usage on Sandstorm:Mages Sanctuary, a Rom24b6 derivative mud
+ *   Currently located at sandstorm.kicks-ass.org port 6969.
+ *   Log in, drop me some comments on the board.  If you need coding assistance, feel free to ask
+ *   Thanks.
+ *                                                              -- Dazzle(Darien)
+ */
+
+in merc.h add this somewhere.
+// Log types
+#define LOG_CRIT       1
+#define LOG_ERR        2
+#define LOG_BUG        4
+#define LOG_SECURITY   8
+#define LOG_CONNECT   16
+#define LOG_GAME      32
+#define LOG_COMMAND   64
+#define LOG_ALL      127	// All the others added up
+
+Add WIZ_LOG to your wiznet flags if you don't already have it.
+
+find your proto-type for log_string and replace it with this.
+void 	log_string	args( (int type, const char *fmt, ... ) );
+
+in db.c add this.
+
+
+char *get_curdate( )
+{
+    static char buf [ 128 ];
+    struct tm *datetime;
+
+    datetime = localtime ( &current_time );
+    strftime( buf, sizeof( buf ), "%m-%d-%Y",  datetime );
+    return buf;
+}
+
+futher on in db.c replace your log_string function with this one.
+
+void log_string(int type, const char *fmt, ... )
+{
+    DESCRIPTOR_DATA *d;
+    va_list args;
+    char *strtime;
+    char buf[45];
+    char bufew[2 * MSL];
+    char bufee[2 * MSL];
+    FILE *log_file;
+    buf[0] = '\0';
+
+    log_file = NULL;
+
+  // Get the wanted text
+    va_start (args, fmt);
+    vsprintf (bufew, fmt, args);
+    va_end (args);
+
+  if (type & LOG_CRIT)
+    {
+	    xprintf( buf, "../log/%s.ritical", get_curdate() );
+	    log_file = file_open( buf, "a" );
+            strtime = ctime( &current_time );
+	    strtime[strlen(strtime)-1] = '\0';
+	    fprintf( log_file, "%s :: %s\n", strtime, smash_colour(bufew) );
+	    fflush(log_file);
+	    file_close( log_file );
+	    for (d = descriptor_list; d != NULL; d = d->next)
+		if (d->connected == CON_PLAYING && IS_IMMORTAL (d->character))
+		  ptc (d->character, "Critical: %s\n\r", bufew);
+	    xprintf(bufee,"Critical: %s",bufew);
+     }
+  if (type & LOG_ERR)
+    {
+	    xprintf( buf, "../log/%s.error", get_curdate() );
+	    log_file = file_open( buf, "a" );
+            strtime = ctime( &current_time );
+	    strtime[strlen(strtime)-1] = '\0';
+	    fprintf( log_file, "%s :: %s\n", strtime, smash_colour(bufew) );
+	    fflush(log_file);
+	    file_close( log_file );
+	    xprintf(bufee,"Error: %s",bufew);
+    }
+  if (type & LOG_BUG)
+    {
+	    xprintf( buf, "../log/%s.bug", get_curdate() );
+	    log_file = file_open( buf, "a" );
+            strtime = ctime( &current_time );
+	    strtime[strlen(strtime)-1] = '\0';
+	    fprintf( log_file, "%s :: %s\n", strtime, smash_colour(bufew) );
+	    fflush(log_file);
+	    file_close( log_file );
+	    xprintf(bufee,"Bug: %s",bufew);
+    }
+  if (type & LOG_SECURITY)
+    {
+	    xprintf( buf, "../log/%s.security", get_curdate() );
+	    log_file = file_open( buf, "a" );
+            strtime = ctime( &current_time );
+	    strtime[strlen(strtime)-1] = '\0';
+	    fprintf( log_file, "%s :: %s\n", strtime, smash_colour(bufew) );
+	    fflush(log_file);
+	    file_close( log_file );
+	    xprintf(bufee,"Security: %s",bufew);
+    }
+  if (type & LOG_CONNECT)
+    {
+	    xprintf( buf, "../log/%s.connect", get_curdate() );
+	    log_file = file_open( buf, "a" );
+            strtime = ctime( &current_time );
+	    strtime[strlen(strtime)-1] = '\0';
+	    fprintf( log_file, "%s :: %s\n", strtime, smash_colour(bufew) );
+	    fflush(log_file);
+	    file_close( log_file );
+	    xprintf(bufee,"Connect: %s",bufew);
+    }
+  if (type & LOG_GAME)
+    {
+	    xprintf( buf, "../log/%s.game", get_curdate() );
+	    log_file = file_open( buf, "a" );
+            strtime = ctime( &current_time );
+	    strtime[strlen(strtime)-1] = '\0';
+	    fprintf( log_file, "%s :: %s\n", strtime, smash_colour(bufew) );
+	    fflush(log_file);
+	    file_close( log_file );
+	    xprintf(bufee,"Game: %s",bufew);
+    }
+  if (type & LOG_COMMAND)
+    {
+	    xprintf( buf, "../log/%s.comm", get_curdate() );
+	    log_file = file_open( buf, "a" );
+            strtime = ctime( &current_time );
+	    strtime[strlen(strtime)-1] = '\0';
+	    fprintf( log_file, "%s :: %s\n", strtime, smash_colour(bufew) );
+	    fflush(log_file);
+	    file_close( log_file );
+	    xprintf(bufee,"Command: %s",bufew);
+    }
+  wiznet(bufee,NULL,NULL, WIZ_LOG, 0, IMMORTAL);
+}

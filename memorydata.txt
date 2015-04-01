@@ -1,0 +1,108 @@
+// *Required header files.* //
+#include <sys/utsname.h>
+#include <sys/resourse.h>
+#include <sys/types.h>
+#include <pwd.h>
+#include <stdio.h>
+#include <unistd.h>
+
+// In my memory command, it allows me to send other commands through it.
+
+WARNING: You may want to limit users access to this, to the creator of the mud.
+This gives VERY detailed information about the mud's shell, and if you piss someone
+off (like an imm who can see this infor) they can easily use it to try and crack into the
+shell, which we ALL want to avoid.
+
+On my mud, this is restricted to my own personal use.  Remember, this displays your shell
+name, if someone knows your shell-account-name, then they have a better chance to crack it.
+
+I ensure my shell-name is different then my mud-name.  For my muds safety.
+
+That way, only me, and the owner of the server know my shell name.
+
+Why do i have this command, because it details information that i like to readily have available.
+
+like if my uid gets modified, i'd like to know, wouldn't you? ;)
+
+if yours doesn't, then at the top of do_memory, put in this.
+
+if(!Strcmp(argument, "userinfo") )
+{
+	memory_user_info(ch);
+	return;
+}
+
+void memory_user_info(CHAR_DATA *ch)
+{
+	uid_t uid;
+	gid_t gid;
+	struct passwd *pw;
+	struct utsname uts;
+	char computer[256];
+	extern struct rusage r_usage;
+	extern struct rlimit r_limit;
+	extern int priority;
+
+	// *Ya, found is true to start.. Only if failed attempts are false  :P* //
+	bool found = true;
+
+	uid = getuid();
+	gid = getgid();
+
+	sendf(ch, "The mud was last compiled on " __DATE__ " at " __TIME__ ".\n");
+
+	sendf(ch, "User is %s\n", getlogin());
+	sendf(ch, "User IDS: uid=%d, gid=%d\n",  uid, gid);
+
+	if(gethostname(computer, 255) !=0 || uname(&uts) < 0)
+	{
+		found = false;
+	}
+
+	// *Am i smart.... Ya, i'd like to think so :P* //
+	if(found)
+	{
+		sendf(ch, "Computer host name is %s\n", computer);
+		sendf(ch, "System is %s on %s hardware\n", uts.sysname, uts.machine);
+		sendf(ch, "Nodename is %s\n", uts.nodename);
+		sendf(ch, "Version is %s, %s\n", uts.release, uts.version);
+	}
+
+	pw = getpwuid(uid);
+	sendf(ch, "UID passwd entry:\n name=%s, uid=%d, gid=%d, home=%s, shell=%s\n", pw->pw_name, pw->pw_uid, pw->pw_gid, pw->pw_dir, pw->pw_shell);
+
+	getrusage(RUSAGE_SELF, &r_usage);
+	sendf(ch, "CPU usage: User = %ld.%06ld, System = %ld.%06ld\n", r_usage.ru_utime.tv_sec, r_usage.ru_utime.tv_usec, r_usage.ru_stime.tv_sec, r_usage.ru_stime.tv_usec);
+
+	priority = getpriority(PRIO_PROCESS, getpid());
+	sendf(ch, "Current Priority = %d\n", priority);
+
+	getrlimit(RLIMIT_FSIZE, &r_limit);
+	sendf(ch, "Current FSIZE limit: soft = %ld, hard = %ld\n", r_limit.rlim_cur, rlimit.rlim_max);
+
+}
+
+// *comm.c* //
+Put these with all the local-variables for the file.
+struct rusage r_usage;
+struct rlimit r_limit;
+int priority;
+
+Then if you have a formated log function (one that allows you to use arguments, do the following)
+
+Right before your mud says 'Normal termination' that blabber stuff...
+
+Thow the following in there.
+
+	getrusage(RUSAGE_SELF, &r_usage);
+	logf("CPU usage: User = %ld.%06ld, System = %ld.%06ld\n", r_usage.ru_utime.tv_sec, r_usage.ru_utime.tv_usec, r_usage.ru_stime.tv_sec, r_usage.ru_stime.tv_usec);
+
+	priority = getpriority(PRIO_PROCESS, getpid());
+	logf( "Current Priority = %d\n", priority);
+
+	getrlimit(RLIMIT_FSIZE, &r_limit);
+	logf( "Current FSIZE limit: soft = %ld, hard = %ld\n", r_limit.rlim_cur, rlimit.rlim_max);
+
+This will give you good details inside of your mud's log-file on shutdown of how much cpu-usage you were using
+and the like, frankly, its just good simple little data, that you can use to better monitor your mud.
+

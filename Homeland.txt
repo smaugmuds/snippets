@@ -1,0 +1,99 @@
+Potential Homeland Code  for smaug1.4a
+
+This will allow you to set the room players goto upon death/start depending on their race.
+This code is a good start to adding homelands that are set depending on the race players
+choose.  You can use ingame mpedit/rpedit/opedit programs to transfer players to homelands
+upon being authorized, or you can add it to mpapply function. 
+Any questions can be directed to Vladaar at vladaar@intelos.net, or the smaug mailing list.
+
+Act_wiz.c
+around line 7804
+add just above set_race
+ race_table[index]->race_death = 0;
+ race_table[index]->race_start = 0;
+
+around line 7840
+add  in set_race
+      send_to_char( "  mana_regen hp_regen  race_death  race_start    \n\r",     ch );
+
+around line 8208
+add under
+        if ( !str_cmp( arg2, "race_recall" ) )
+        {
+              race->race_recall = atoi( argument );
+              send_to_char( "Race Recall is set.\n\r", ch );
+              return;
+        }
+	if ( !str_cmp( arg2, "race_death" ) )
+	{
+		race->race_death = atoi( argument );
+		send_to_char( "Race Death is set.\n\r", ch );
+		return;
+	}
+
+        
+    	if ( !str_cmp( arg2, "race_start" ) )
+	{
+		race->race_start = atoi( argument );
+		send_to_char( "Race Start Room is set.\n\r", ch );
+		return;
+	}
+
+around line 8355
+add
+/* This adds race_death and race_recall values to show up in showrace command */
+	sprintf(buf, "Race_Death: %d\n\r", race->race_death);
+ send_to_char( buf, ch);
+	sprintf(buf, "Race_Recall: %d\n\r", race->race_recall);
+ send_to_char( buf, ch);
+        sprintf(buf, "Race_Start: %d\n\r", race->race_start);
+ send_to_char( buf, ch);
+
+Handler.C
+in extract_char
+around line 1818
+add
+	if (!location) 
+		location = get_room_index( race_table[ch->race]->race_death);
+
+MUD.H
+around line 1110
+add under
+        sh_int      race_recall;
+	sh_int      race_death;
+	sh_int      race_start;
+
+Tables.C
+around line 1781
+add under
+        fprintf( fpout, "Race_Recall %d\n",     race->race_recall   );
+	fprintf( fpout, "Race_Death  %d\n",     race->race_death    );
+       	fprintf( fpout, "Race_Start  %d\n",     race->race_start    );
+
+around line 1904
+in CASE R:
+                add under
+                KEY( "Race_Recall", race->race_recall,     fread_number( fp ) );
+		KEY( "Race_Death", race->race_death,       fread_number( fp ) );
+		KEY( "Race_Start", race->race_start,       fread_number( fp ) );
+
+Mud_comm.c
+In function  
+void mpapplyb
+
+find :
+
+	if ( !victim->desc )
+	{
+		send_to_char( "Not on linkdeads.\n\r", ch );
+		return;
+	}
+add :
+	 if ( !IS_IMMORTAL( victim ) ) {	
+        char_from_room(victim);
+        char_to_room(victim, get_room_index(race_table[victim->race]->race_start > 0 ?
+race_table[victim->race]->race_start : ROOM_VNUM_TEMPLE));
+act( AT_WHITE, "$n enters this world from within a column of blinding light!",
+    victim, NULL, NULL, TO_ROOM );
+}
+return;

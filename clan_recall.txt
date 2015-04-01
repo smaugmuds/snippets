@@ -1,0 +1,122 @@
+From: zolasg@weiss.che.utexas.edu (George Zolas)
+
+Well, Commander Boston gave me the idea, and I went ahead and coded it.
+
+Here is a functional clan recall. Just follow the directions!
+
+Of course, you can write your own help for it.  Give me credit, if you want.  
+This thing was quite easy to code, and I'm ashamed that I'd even consider
+taking credit for the code, which was totally written by Russ for ROM2.4b2,
+except for about 34 characters. ;)
+Enjoy.
+
+*******************************************************************************
+add something like this 
+to help.are
+***********************
+-1 CLANRECALL~
+syntax:  clanrecall [enter]
+Clanrecall is used by clan members to recall back to their clan rooms,
+instead of to the generic mud recall room.
+~
+
+
+Add this to interp.h
+******************
+DECLARE_DO_FUN(	do_clan_recall	);  /* Froth of Dyre MUD */
+
+Add this line to interp.c
+*******************
+ { "clanrecall",do_clan_recall,	POS_FIGHTING,	 0,  LOG_NORMAL, 1 },
+
+
+Add this  stuff to act_move.c
+**********************
+
+#include "tables.h"
+
+DECLARE_DO_FUN(do_clan_recall	);
+
+/* clan_recall added by Froth of Dyre MUD */
+
+void do_clan_recall( CHAR_DATA *ch, char *argument )
+{
+    char buf[MAX_STRING_LENGTH];
+    CHAR_DATA *victim;
+    ROOM_INDEX_DATA *location;
+
+    if (IS_NPC(ch) && !IS_SET(ch->act,ACT_PET))
+    {
+	send_to_char("Only players can recall.\n\r",ch);
+	return;
+    }
+  
+    act( "$n prays for transportation!", ch, 0, 0, TO_ROOM );
+
+    if ( ( location = get_room_index( clan_table[ch->clan].hall) ) == NULL )
+
+    {
+	send_to_char( "You are completely lost.\n\r", ch );
+	return;
+    }
+
+    if ( ch->in_room == location )
+	return;
+
+    if ( IS_SET(ch->in_room->room_flags, ROOM_NO_RECALL)
+    ||   IS_AFFECTED(ch, AFF_CURSE))
+    {
+	send_to_char( "The Gods have forsaken you.\n\r", ch );
+	return;
+    }
+
+    if ( ( victim = ch->fighting ) != NULL )
+    {
+	int lose,skill;
+
+	skill = get_skill(ch,gsn_recall);
+
+	if ( number_percent() < 80 * skill / 100 )
+	{
+	    check_improve(ch,gsn_recall,FALSE,6);
+	    WAIT_STATE( ch, 4 );
+	    sprintf( buf, "You failed!.\n\r");
+	    send_to_char( buf, ch );
+	    return;
+	}
+
+	lose = (ch->desc != NULL) ? 25 : 50;
+	gain_exp( ch, 0 - lose );
+	check_improve(ch,gsn_recall,TRUE,4);
+	sprintf( buf, "You recall from combat!  You lose %d exps.\n\r", lose );
+	send_to_char( buf, ch );
+	stop_fighting( ch, TRUE );
+	
+    }
+
+    ch->move /= 2;
+    act( "$n disappears.", ch, NULL, NULL, TO_ROOM );
+    char_from_room( ch );
+    char_to_room( ch, location );
+    act( "$n appears in the room.", ch, NULL, NULL, TO_ROOM );
+    do_look( ch, "auto" );
+    
+    if (ch->pet != NULL)
+	do_clan_recall(ch->pet,"");
+
+    return;
+}
+
+
+/* end of clan_recall */
+
+*********************************************************
+*                     George Zolas                      *
+*              zolasg@weiss.che.utexas.edu              *
+*    Froth of DyreMUD - vanwinkle.che.utexas.edu 2222   *
+*                    Testing only                       *
+*          " If I can't lead you by force,              * 
+*            I'm gonna do it by example. "              *
+********************************************************* 
+
+

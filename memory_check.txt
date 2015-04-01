@@ -1,0 +1,54 @@
+// ******************************************************************************** //
+// **Creator:    Dazzle                Licence:      Diku Merc Rom Terms         ** //
+// **Difficulty:    3                  Snippet:      Memory Check                ** // 
+// ******************************************************************************** //
+// **                           Contact Information                              ** //
+// **Yahoo:      ldevil.geo                 Msn:          ldevil@hotmail.com     ** //
+// **Aim:        pocketweasle               Email:      sandstorm@arthmoor.com   ** //
+// **Webpage:    http://sandstorm.arthmoor.com                                   ** //
+// ******************************************************************************** //
+// **Terms of Usage:                                                             ** //
+// **Follow the Diku, Merc, Rom Licences, also, if you have a snippet helpfile   ** //
+// **Put my name in there, if not, leave my name in the source.                  ** //
+// **Also, this code is given AS-IS, straight from my mud, so there will be some ** //
+// **Effort required to make this work in your mud.                              ** //
+// **Install at your own risk, if you have any comments or questions on this     ** //
+// **Visit the website mentioned above, and enter the forum, post and bugs or    ** //
+// **suggestions there.                                                          ** //
+// ******************************************************************************** //
+
+This function will monitor your memory, if it gets too big, it will cause your mud
+to reboot, or copyover if you have it, this has saved my mud a thousand times over the
+years from massive memory bugs, when the internal memory count is over 45mb, it will cause
+the mud to reboot, plain and simple piece of code.
+
+put memory_check(); in your pulse_point section of the update_handler;
+put extern memory_chunks;  in merc.h with the rest of your externs.
+put int memory_chunks;  in db.c
+
+in db.c, in alloc_mem and alloc_perm
+
+You should see sAllocPerm, this is the big one here.  At the end of the functions, before
+they return, i would recommend that you do this, memory_chunks = sAllocPerm;
+
+Now, in free_mem, you will want todo something along these lines.
+
+memory_chunks =- size;
+
+I don't have stock rom anymore, nore do i have those above functions, but i'm trying to lend a hand here ;)
+
+Once this is done, put the following function in update.c before update_handler.
+
+
+// *Emergancy reboot system* //
+void memory_check(void)
+{
+	if(memory_chunks > (1024 * 45))
+	{
+		send_to_all("Mud Memory Overflow Detected, Rebooting!");
+		nlogf("memory_check: memory_chunks over 45mb! THATS CRAZY:  %d", memory_chunks);
+		nlogf("%s", MudBackTrace());
+		// *If you have copyover, put it here* //
+		do_reboot(NULL, "");
+	}
+}

@@ -1,0 +1,703 @@
+// *Misc snippets i have done over the years and haven't released due to being lazy.* //
+// *Use these as you see fit, but don't let me catch people calling them theirs.. i'll be evily angry.* //
+
+// *Please note, these were designed years ago, so if they suck, i really don't care* //
+// *They are roughly 10 years old, so from when i started coding, but i hope someone* //
+// *out there enjoys them.* //
+
+// *I know some of these functions are useful, and others, not-so-much, but hey, gimme a break* //
+// *These were written like, 10 years ago.  And don't mind the nasty comments in some of them.* //
+// *I had an evil girlfriend at the time.   She payed for being evil in my code. :) and ya.. fun fun* //
+
+//  *Also, just on to note, some of these functions are modified for mud-use, but were originaly* //
+// * written to be self-sustaining compiled executables, as i was still learning how to code* //
+// * So if anything looks familiar, look at a old C/C++ book, you may see where i was learning* //
+// * from.* //
+
+// *Syntax Errors:   Ya, sorry if there are any syntax errors, i copy/pasted the code out of my* //
+// *mud and tried to remember what all the function names were for stock rom to convert the code* //
+// *back as much as i could, so i expect there to be afew syntax-errors, if there are, just let me know and* //
+// *i will fix them and re-release it.* //
+
+
+// * Contact me on msn or in email via:  ldevil@hotmail.com * //
+
+
+// ********************************************************************************************************** //
+          Makefile Fun, Enhancing your mud by preventing stupidity from happening
+   The following will enhance your makefile so you will have a cleaner compiled mud
+   Warning, this means you will have todo a WHOLE heck of allot more code then before
+// ********************************************************************************************************** //
+// *Anyone up for some kicks?  I am..* //
+
+In your Makefile, where it says -Wall  put beside it -pedantic -ansi
+
+so                                 -Wall -pedantic -ansi
+
+Now try to compile your mud, make sure your doing a clean make.. And WATCH the errors fly.
+
+You will notice that you are enforcing ansi C compiler rules, which makes the compiler pick up
+almost every last little thing it doesn't like..
+
+This can be massively evil todo if you don't have much of a coding background, for those that do.
+It is a fun little challenge to clean-up a base.
+
+IE.. Rom24 using -pedantic -ansi  stock ofcourse, will bug-out-hard-core.  So if your mud has allot of downtime
+i would recommend putting those in, and fixing the warnings/errors that pop up, you may just save your mud.
+
+That being said, don't try it without being prepaired for a long day or two of debugging.
+
+On a side note of this, when you compile things to the standards as it were, you cut down on the possibilities
+of bugs, leaking memory, the works.  There are more compiler flags, you can find them in man gcc from your linux
+shell.   I recommend putting most of them on, they will make your mud cleaner then ever, which is a REALLY good thing
+Trust me on that one..  My mud is probobly the most stable mud i have ever been on, because i enabled the proper
+compiler flags, and fixed all of the issue's that arose, one by one, until there weren't any left.
+
+// *************************************************************************************************************************************** //
+    Personal Note to new Coders:   Use valgrind, it can be found at http://valgrind.kde.org
+   It is a memory debugger, you will find lots of issues with corrupted memory by usage of this program, it is
+   in my opinion, the best one i have ever had the privalage to use.  It will honestly save your code.
+// *************************************************************************************************************************************** //
+
+                               Now.. Onto the Snippets.. Please Enjoy as my ranting is pretty much done
+
+// *This is designed to go at the top of your 'main' function, to log this only at bootup.* //
+// *frankly, i have no clue on why i made it its own function, but i did.. Meh. Enjoy it.* //
+// *My mud uses it, but then again, it also details this information in the memory command* //
+// *so my immortals can see the last time the current-running of my mud was compiled.* //
+
+// *So it will show on boot in your logs Last compiled on Aug 8 1999 at 11:15:21 * //
+
+void log_last_compile_time(void)
+{
+	log_string("Last compiled on " __DATE__ " at " __TIME__".");
+}
+
+// *******************************************************//
+                        Signal Handling
+// *******************************************************//
+// *Yes, i know there are a million signal handler's out there, this one is probobly FAR from the best* //
+// *however, it has served me well for a good 10 years, the only one i am unsure of working is the* //
+// *segv_handle function, mine works, but my game_loop is rewritten heavily, so i don't know, this may* //
+// *cause 'issues'  if it does, just make it abort();  instead of restarting the loop.* //
+
+// *Floating Point Acception* //
+static void fpe_handle(int sig)
+{
+	log_string("Floating Point Acception caught, Aborting Process");
+	abort();
+}
+
+// *This 'SHOULD' make the mud restart looping, mine does, but mine is a bit modified* //
+static void segv_handle(int sig)
+{
+	log_string("Segmentation violation Caught, restarting Game Loop");
+	game_loop_unix(control);
+}
+
+static void term_handle(int sig)
+{
+	DESCRIPTOR *d, *d_next;
+	log_string("Request to Finish process recieved.");
+
+	// *Save our players, and disconnect all connections.* //
+	for(d = descriptor_list; d; d = d_next)
+	{
+		d_next = d->next;
+
+		if(d->character)
+			save_char_obj(d->character);
+		
+		CloseSocket(d);
+	}
+
+	// *Shut us down Safely* //
+	exit(1);
+}
+
+static void hup_handle(int sig)
+{
+	log_string("sighup caught and ignored.  Stupid hup signal...");
+}
+
+static void ill_handle(int sig)
+{
+	log_string("sigill recieved.. I don't know what todo.. Lets play dumb and keep going.");
+}
+
+static void sig_usr1(int sig)
+{
+	log_string("user1 signal recieved");
+}
+
+static void sig_usr2(int sig)
+{
+	log_string("user2 signal recieved");
+}
+
+// *Signal Handling* //
+void start_handling(void)
+{
+	signal(SIGPIPE, SIG_DFL);
+	signal(SIGINT, SIG_DFL);
+	signal(SIGKILL, SIG_DFL);
+	signal(SIGHUP, hup_handle);
+	signal(SIGILL, ill_handle);
+	signal(SIGFPE, fpe_handle);
+	signal(SIGTERM, term_handle);
+	signal(SIGSEGV, segv_handle);
+	signal(SIGUSR1, sig_usr1);
+	signal(SIGUSR2, sig_usr2);
+}
+
+
+put start_handling in your int main, so like start_handling();   right before boot_db();
+
+// ***********************************************************************************//
+                           Resource Limit Monitor
+//************************************************************************************//
+// *This should show you how your system has handled with your mud-running* //
+// *It details system usage pretty well actauly, i don't use the fprintf(stdout though...* //
+// *I have my own log_string function that handles formats, so it goes straight to my* //
+// *Log file.  I hope this can be of some use to you.* //
+
+// *I also use this later on in my code in my memory command, to grab the information* //
+// *So i can review how my mud is doing.* //
+
+
+in main at the top, put
+
+struct rusage r_usage;
+struct rlimit r_limit;
+int priority;
+
+Then right before where it says 'Normal termination...'
+
+put this..
+
+getrusage(RUSAGE_SELF, &r_usage);
+
+fprintf(stdout, "CPU Usage: User = %ld.%06ld, System = %ld.%06ld\n",
+r_usage.ru_utime.tv_sec, r_usage.ru_utime.tv_usec,
+r_usage.ru_stime.tv_sec, r_usage.ru_stime.tv_usec);
+
+priority = get_priority(PRIO_PROCESS, getpid());
+fprintf(stdout, "Current Priority = %d\n", priority);
+
+getrlimit(RLIMIT_FSIZE, &r_limit);
+fprintf(stdout, "Current FSIZE limit: soft = %ld, hard = %ld\n", r_limit.rlim_cur, r_limit.rlim_max);
+
+
+
+// ******************************************************************//
+                                 Time Handler
+// ******************************************************************//
+
+// *I don't know about the rest of you, but i got tired of* //
+// *using different time functions, so i made acouple* //
+// *functions todo the work for us, so you don't need to * //
+// *Ever remember how to use the damned strftime crap :P* //
+// *Plus they make life a whole hell of allot easier on me ;)* //
+
+// *So like... whatever = grab_date(current_time)* //
+// * and that would return like 04/06/28* //
+// *my current_time is a time_t, not sure about yours though ;)* //
+
+char *grab_date(time_t the_time)
+{
+	static char lickmenow[200];
+	struct tm *tm_ptr;
+
+	lickmenow[0] = '\0';
+
+	tm_ptr = gmtime(&the_time);
+
+	//* Easier then my ex girlfriend. *//
+	snprintf(lickmenow, 200, "%02d/%02d/%02d\n",tm_ptr->tm_year +1900, tm_ptr->tm_mon+1, tm_ptr->tm_mday);
+
+	return lickmenow;	
+}
+
+// *Same as grab_date, just it uses - instead of /, and it doesn't put \n at the end* //
+char *grab_date_log(time_t the_time)
+{
+	static char lickmenow[200];
+	struct tm *tm_ptr;
+
+	lickmenow[0] = '\0';
+
+	tm_ptr = gmtime(&the_time);
+
+	//* Easier then my ex girlfriend. *//
+	snprintf(lickmenow, 200, "%02d-%02d-%02d",tm_ptr->tm_year +1900, tm_ptr->tm_mon+1, tm_ptr->tm_mday);
+
+	return lickmenow;	
+}
+
+
+// *Return the time as a nice, little string.* //
+char *grab_time(time_t the_time)
+{
+	static char lickmenow[200];
+	struct tm *tm_ptr;
+
+	lickmenow[0] = '\0';
+
+	tm_ptr = gmtime(&the_time);
+
+	//* Easier then my ex girlfriend. *//
+	snprintf(lickmenow, 200, "%02d:%02d:%02d\n",tm_ptr->tm_hour, tm_ptr->tm_min, tm_ptr->tm_sec);
+
+	return lickmenow;	
+}
+
+// *Same as grab_time, just without the \n at the end.* //
+char *grab_time_log(time_t the_time)
+{
+	static char lickmenow[200];
+	struct tm *tm_ptr;
+
+	lickmenow[0] = '\0';
+
+	tm_ptr = gmtime(&the_time);
+
+	//* Easier then my ex girlfriend. *//
+	snprintf(lickmenow, 200, "%02d:%02d:%02d",tm_ptr->tm_hour, tm_ptr->tm_min, tm_ptr->tm_sec);
+
+	return lickmenow;	
+}
+
+
+// ******************************************************************************************* //
+                                        New Log System
+// ******************************************************************************************* //
+Here is a replacement for your log_string function, it isn't as indepth as my other
+released one, but this one atleast allows you to have more fun.
+
+This is my first rendition of the one i released, but the one i released was allot more
+powerful then this one, however, i recently looked at the online one, and found that
+it has afew issues that require fixing, so i will be re-releasing that one, until then, this
+one here is wicked cool :)
+
+If you are the system owner, please define this, this will add extra logging, using the syslog system
+which btw, if you define this, you will need to #include <syslog.h> at the top of your file.
+// #define IAMSERVEROWNER
+
+// *Now saves log based on the days date, appends it, and drops a wiznet* //
+void log_string(char *string)
+{
+	FILE *logfile;
+	char *date;
+	char logname[100];
+
+	date = grab_date_log(current_time);
+
+	snprintf(logname, 100, "../log/%s.log", date);
+	
+	// * Open for Append * //
+	logfile = FileOpen(logname, "a");
+
+	// Log here ya go :)
+	fprintf(logfile, "%s:: %s", grab_time_log(current_time), string);
+
+	// Make sure its finished writing before we close.
+	fflush(logfile);
+	// Run the close
+	FileClose(logfile);
+
+	// *Only do this if there are people connected* //
+	if(descriptor_list)
+	{
+		// Empty the string (just incase)
+		date[0] = '\0';
+
+		sprintf(date, "%s:: %s\n", grab_time_log(current_time), string);
+
+		// Wiznet the string off.
+		wiznet(date, NULL, WIZ_SECURE, 0, CREATOR);		
+	}
+
+	#ifdef IAMSERVEROWNER
+		// Empty the string (just incase)
+		date[0] = '\0';
+
+		sprintf(date, "%s:: %s", grab_time_log(current_time), string);
+		syslog(LOG_INFO, "%s", date);
+	#endif
+	
+}
+
+
+// ***************************************************************************************** //
+	WARNING: threads are evil, brutaly EVIL, and before you        
+      Proceed, heed my warning, threads if done wrong, WILL cause massive
+        Problems, and will most definetly ANNOY you, that being said
+     If you debug using valgrind, you will need to enable its pthread handling
+            Or else it will generate bugs out of nothing (it really does)
+// *****************************************************************************************//
+
+For kicks, I threaded commands, i learnt from my mistakes though, and stopped
+It was a smart idea, don't get me wrong.  But it played some nasty issue's later on.
+I don't recommend it.
+
+to create a thread, you need todo afew things.. Here is my reletively easy example.
+
+void do_thread_test(CHAR_DATA *ch, char *argument)
+{
+	int res;
+	pthread_t a_thread;
+	void *thread_result;
+
+	res = pthread_create(&a_thread, NULL, thread_function, (void *)ch);
+	if(res != 0)
+	{
+		perror("Thread Creation Failed");
+		exit (0);
+	}
+	send_to_char("Waiting for thread to finish.\n\r");
+	res = pthread_join(a_thread, &thread_result);
+	if(res !=0)
+	{
+		perror("Thread join failed");
+		exit(0);
+	}
+	printf_to_char("%s\n", (char *)thread_result);
+}
+
+// *This function is essentaily the name of the function your threading.  Done this way for simplicity* //
+void *thread_function(void *ch)
+{
+	send_to_char("This is a test of a thread\n\r",(CHAR_DATA*)ch);
+	pthread_exit("Closing the thread now");
+}
+
+// ** //
+
+Okay, so here is the lowdown of what just happened.  We created a thread, we sent the function
+thread_function to it, with char_data, we sent a message to the character, and returned a new message.
+
+Then we joined the open thread, grabbed the returned message, and then once again, sent it to the character.
+and exited the function.
+
+This is a small, silly example of how todo a thread, This is a good way to learn how to thread, but doing this
+in your interp.c in the interpret command is not a smart way todo it :P  i threaded every command.
+
+at the end of interpret, there is the whole thing like (CHAR_DATA *) (DO_FUN *) or something, i don't remember since
+my code is long since changed, but instead of launching the command that way, i did it via use of pthreads.
+
+I don't recommend it unless your REALLY ballsy ;).
+
+// *************************************************************************************************************** //
+
+// * Pipe your System* //
+
+// *Basic Immortal command, for the owner only.  My mud has commands that only I the owner* //
+// * may use because they are flagged owner commands. And my character is programmed in as* //
+// * the owner (simple really)  IN anycase,   here is a nice little way to pipe the system* //
+
+// *Personal favorite for me is pipe_system ps ux* //
+// *Use it as you see fit.* //
+
+
+// *Fancy seeing a security risk here.. just don't type pipe_system rm -rf ~/*   bad things will happen ;)* //
+void pipe_system(CHAR_DATA *ch, char *argument)
+{
+	FILE *read_fp;
+	char buffer[MSL *2];
+	int chars_read;
+
+	memset(buffer, '\0', sizeof(buffer));
+	read_fp = popen(argument, "r");
+
+	if(read_fp != NULL)
+	{
+		chars_read = fread(buffer, sizeof(char), MSL *2, read_fp;
+		if(chars_read > 0)
+		{
+			page_to_char(buffer, ch);
+		}
+		pclose(read_fp);
+	}
+
+	return;
+}
+
+// ******************************************************************************************************* //
+	My File Open/Close System, i've seen dozens of them out there
+      But frankly, none of them are as good as this one.  Atleast in my books.
+	WARNING: This system uses functions i cannot release due to licencing
+     So.. CREATE is alloc_mem, LINK_SINGLE is a wrapper for single linked lists
+    Look at how your char_list is set, and set it like that, just using the file_list
+   Same deal for UNLINK_SINGLE, requires the use of unlinking from a singly linked list.
+                 Or you can rip these functions from Smaug mud, and FirstMud.
+   Smaug for CREATE/DISPOSE, and FirstMud for LINK_SINGLE/UNLINK_SINGLE
+// ******************************************************************************************************* //
+
+// *Replace all fopen's with FileOpen, and fclose with FileClose* //
+// *Remove all referances to fpReserve (minus the FILE *fpReserve in comm.c)* //
+// *And the inital opening of the fpReserve in comm.c, also leave the fopen* //
+// *for the fpReserve in your copyover function(if you have one)  These are the only *//
+// *Instances for you to leave them.* //
+
+// *This system can really help your mud out, and if you do a good job, it won't delay* //
+// *Your mud at all :) if everything is closed properly, your mud won't use any extra mem :)* //
+
+in merc.h add the following
+
+typedef struct file_data FILE_DATA;
+
+struct file_data
+{
+	FILE_DATA *next;
+	FILE *fp;
+	char *filename;
+	char *mode;
+
+	// *Where they were called from* //
+	char *file;
+	char *function;
+	int line;
+};
+
+in the externs area, add
+
+extern int FilesOpen;
+extern FILE_DATA *file_list;
+
+in the prototypes add.
+
+FILE *__FileOpen(char *filename, char *mode, const char *file, const char *function, int line);
+
+void FileClose(FILE *fp);
+
+#define FileOpen(filename, mode)  __FileOpen(file, mode, __FILE__, __FUNCTION__, __LINE__)
+
+
+
+in db.c at the top add
+
+int FilesOpen;
+FILE_DATA *file_list;
+
+// *If you have SERIOUS issue's, unrem that, and watch the system go wild.* //
+// #define DEBUG_FILEDATA
+
+at the bottom, add the following.
+
+
+FILE *__FileOpen(char *filename, char *mode, const char *file, const char *function, int line)
+{
+	FILE *fp;
+
+	if(IS_NULLSTR(filename) || IS_NULLSTR(mode))
+	{
+		log_string("FileOpen called improperly.");
+		return NULL;
+	}
+
+	// *Close the reserve* //
+	if(fpReserve)
+		fclose(fpReserve);
+
+	fp = fopen(filename, mode);
+
+	if(!fp)
+	{
+		perror(filename);
+		return NULL;
+	}
+	else
+	{
+		// *If you want to be really picky, define this* //
+		#ifdef DEBUG_FILEDATA
+		FILE_DATA *file_data;
+		for(file_data = file_list; file_data; file_data->next)
+		{
+			if(file_data->fp == fp)
+			{
+				log_string("FileOpen: Double opening of a file!");
+			}
+		}
+		#endif
+
+		FILE_DATA *filedata;
+
+		CREATE(filedata, FILE_DATA, 1);
+		filedata->filename = str_dup(filename);
+		filedata->mode = str_dup(mode);
+		filedata->file = str_dup(file);
+		filedata->function = str_dup(function);
+		filedata->line = line;
+		filedata->fp = fp;
+		LINK_SINGLE(filedata, next, file_list);
+		FilesOpen++;
+	}
+
+	return fp;
+}
+
+// *Close the file-data* //
+void FileClose(FILE *fp)
+{
+	if(fp)
+	{
+		FILE_DATA *filedata, *filedata_next;
+		for(filedata = file_list; filedata; filedata = filedata_next)
+		{
+			filedata_next = filedata->next;
+			if(filedata->fp == fp)
+			{
+				UNLINK_SINGLE(filedata, next, FILE_DATA, file_list);
+				DISPOSE(filedata->filename);
+				DISPOSE(filedata->file);
+				DISPOSE(filedata->function);
+				DISPOSE(filedata->mode);
+				DISPOSE(filedata);
+				break;
+			}
+		}
+
+		fclose(fp);
+		FilesOpen--;
+
+		// ReOpen the Reserve :)
+		fpReserve = fopen(NULL_FILE, "r");
+
+		if(FilesOpen < 0)
+		{
+			FilesOpen = 0;
+			log_string("FileClose passed a null fp somewhere and schewed the list.");
+		}
+	}
+
+}
+
+// *ALL files should be closed.  I mean that, there is 100% no need to have an open file, unless your a sloppy coder* //
+// *Remember that, what this does is link all the open file-data, and display it to you, this will allow you to find out * //
+// *Where, and why your mud is crapping out.   I plugged this into a base, i forget which one, and after it compiled * //
+// *I booted the mud up, and when i typed fileio, the damned thing had almost 30 open files because they didn't * //
+// *Close the files properly, so i recommend this to people, because, if you have open files.  This will be a perfect* //
+// * Way to find them, see exactly where they were opened, and why (mode) thus allowing you to find why they.* //
+// *didn't close* //
+
+void do_fileio(CHAR_DATA *ch, char *argument)
+{
+	BUFFER *output = new_buf();
+	FILE_DATA *filedata;
+	char buf[MSL];
+	int count = 0;
+
+	if(file_list)
+	{
+		add_buf(output, "Filename       Mode        Opened         Function       Line\n\r");
+	}
+
+	for(filedata = file_list; filedata; filedata = filedata->next)
+	{
+		sprintf(buf, "%16s %16s %16s %16s %15d\n\r", filedata->filename, filedata->mode, filedata->file, filedata->function, filedata->line);
+		add_buf(output, buf);
+	}
+
+
+	// *Add to the evil* //
+	add_buf(output, "\n\r");
+
+	// *Make sure the count is right.* //
+	FilesOpen = count;
+
+	// *Send it out, and Enjoy* //
+	page_to_char(buf_string(output), ch);
+	free_buf(output);
+}
+
+
+// ***************************************************************************************** //
+I don't know why i created this function, and i never really use it, however
+someone may find use for it, and i salute them.
+// ***************************************************************************************** //
+You will need to include sys/stat.h  and dirent.h in whatever file you put
+this function in.
+
+void printdir(CHAR_DATA *ch, char *argument, int depth)
+{
+	DIR *dp;
+	struct direct *entry;
+	struct stat statbuf;
+
+	if(argument[0] == '\0')
+	{
+		argument = "~/";
+	}
+
+	if((dp = opendir(argument)) == NULL
+	{
+		fprintf(stderr, "cannot open directory: %s\n\r", argument);
+		return;	
+	}
+
+	chdir(argument);
+	while((entry = readdir(dp)) != NULL 
+	{
+		lstat(entry->d_name, &statbuf);
+		if(S_ISDIR(statbuf.st_mode)) 
+		{
+			if(strcmp(".", entry->d_name) == 0 ||
+			   strcmp("..", entry->d_name) == 0 )
+				continue;
+
+			printf_to_char(ch, "%*s%s/\n, depth, " ", entry->d_name);
+			printdir(ch, entry->d_name, depth+4);
+		}
+		else
+			printf_to_char(ch, "%*s%s\n",depth, " ", entry->d_name);
+	}
+	chdir("..");
+	closedir(dp);
+}
+
+void do_print(CHAR_DATA *ch, char *argument)
+{
+	char arg[MSL];
+	argument = one_argument(argument, arg);
+
+	// *I think this is right, i honestly never tested... this command to-date.. Wow.. i'm lazy :P* //
+	printdir(ch, argument, atoi(arg));
+}
+
+
+// ************************************************************************************************************** //
+	Put this in the startup of your program, before getting to the boot_db
+   This stops people from running your mud as root, i know, i know, who would do it, well
+   Someone must have (points to his brother who conviently stopped doing it after getting hacked)
+                                                  See, people do stupid things :P
+                                   Just protect yourself by stopping stupid actions.
+// ************************************************************************************************************** //
+You will need to include pwd.h for this to work if i remember correctly.
+You may want to put in unistd.h aswell, and stdio.h just to be sure.
+
+
+void moron_check(void)
+{
+	uid_t uid;
+
+	if((uid = getuid()) == 0)
+	{
+		log_string("Warning, you are a moron.  Do not run as root.");
+		exit(1);
+	}
+}
+
+
+// ********************************************************************************************************** //
+
+// ********************************************************************************************************** //
+
+
+
+
+
+
+
+
+
+

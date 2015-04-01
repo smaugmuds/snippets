@@ -1,0 +1,186 @@
+/* ----
+First off, let me just say this is some really stinking ugly code.
+It's so ugly I hate releasing it as a snippet... But it works, and
+I guess that's what matters.
+---- */
+
+/* ----
+This could very well require some tweaking to add to your code. In
+fast, I'm almost positive it will if you have modified you help file
+structure in any way. This also requires some helper functions. The
+ones that I made are included while the others that are required are
+not included. I didn't feel right about posting someone else's code
+with my snippet, but I'll tell you what to look for.
+
+html_colourconv: this comes from Clandestine MUD, I believe. Looks
+for a snippet called whoweb.c or something like that.
+
+command sorting is from a post made by Dingo quite a while back on
+the romlist at www.the-infinite.org/lists/romlist
+
+These helper functions are fairly crucial to making this whole thing
+work right. They're just spoofs of smash_tilde, but they do the job.
+Drop them into db.c or whereever you want them located. Db.c is a
+good place since that's where smash_tilde is by default.
+---- */
+
+void smash_forwardslash( char *str )
+{
+    for ( ; *str != '\0'; str++ )
+    {
+	if ( *str == '/' )
+	    *str = '_';
+    }
+
+    return;
+}
+void smash_space( char *str )
+{
+    for ( ; *str != '\0'; str++ )
+    {
+	if ( *str == ' ' )
+	    *str = '_';
+    }
+
+    return;
+}
+void smash_tics( char *str )
+{
+    for ( ; *str != '\0'; str++ )
+    {
+	if ( *str == '\'' )
+	    *str = '.';
+    }
+
+    return;
+}
+
+/* ----
+You will absolutely have to change the directories and URL listed
+for this to work, but that should be simple enough. I'm not real
+good at commenting my code, but honestly, I did try. :)
+
+No credit is required for using this. Do with it what you want
+except call it your own. The idea came from a post written by
+Kyndig a while back on the romlist, so give him credit if you
+want.
+
+In order to get the socials and commands to pop up right, you
+can use a simple php call like <?php include("soc.txt"); ?>
+
+Finally, I stuck this into a command called do_immortal, which is
+where I stick all my 'helpers'. Put it whereever you want it.
+---- */
+
+	if ( !str_prefix( arg1, "WebDump" ) )
+	{
+	    FILE *fp;
+	    HELP_DATA *pHelp;
+	    char cmdBuf[MSL], socBuf[MSL], helpBuf[MSL], htxtBuf[MSL], hKey[MSL], helpBuf2[MSL];
+	    int iSocial;
+	    int col = 0;
+	    int  index[MIL*4];
+	    int  cmd;
+	    int  i, count = 0;
+
+	    /* open file */
+	    fclose( fpReserve );
+	    fp = fopen( "/home/aww/public_html/lists/soc.txt","w" );
+
+		/* dump the socials */
+	    for ( iSocial = 0; social_table[iSocial].name[0] != '\0'; iSocial++ )
+	    {
+			sprintf( socBuf,"%13s",social_table[iSocial].name );
+			if ( ++col % 6 == 0 )
+		    	strcat( socBuf, "\n" );
+		    fprintf( fp, socBuf );
+	    }
+
+	    fclose( fp );
+	    fp = fopen( "/home/aww/public_html/lists/cmd.txt","w" );
+
+		/* dump the commands */
+	    for ( count = 0; cmd_table[count].name[0] != '\0'; count++ )
+	        index[count]=count;
+
+	    qsort( index, count, sizeof(int), CmdCount);
+
+	    for ( i = 0; i < count ; i++ )
+	    {
+	        cmd = index[i];
+
+			if ( cmd_table[cmd].level < LEVEL_HERO
+			&&   cmd_table[cmd].show )
+	        {
+				sprintf( cmdBuf, "%13s", cmd_table[cmd].name );
+				if ( ++col % 6 == 0 )
+			    	strcat( cmdBuf, "\n" );
+			    fprintf( fp, cmdBuf );
+	        }
+	    }
+
+
+		/* dump the help text */
+	    for ( pHelp = help_first; pHelp != NULL; pHelp = pHelp->next )
+	    {
+			if ( !str_cmp( pHelp->keyword, "PROMPT PROMPTS" ) )
+				continue;
+
+			/* init these to null for safety's sake */
+			htxtBuf[0] = '\0';
+			helpBuf[0] = '\0';
+			helpBuf2[0] = '\0';
+			hKey[0] = '\0';
+
+		    fclose( fp ); /* this looks out of place, but it gets opened and needs closing */
+		    sprintf( htxtBuf, "%s.html", pHelp->keyword );
+
+		    /* now we have a HELP KEYWORD.html file, so let's fopen it */
+		    /* get rid of all spaces and forward slashes, first */
+		    smash_forwardslash( htxtBuf );
+		    smash_space( htxtBuf );
+		    smash_tics( htxtBuf );
+		    /* have to re-add the path to the buffer */
+		    sprintf( hKey, "/home/aww/public_html/lists/" );
+		    strcat( hKey, htxtBuf );
+		    fp = fopen( hKey, "w" );
+
+		    /* cat the help text into the .html file
+			sprintf( helpBuf, "%s\n", pHelp->related );
+		    smash_forwardslash( helpBuf );
+		    smash_space( helpBuf );
+		    fprintf( fp, helpBuf );*/
+
+			sprintf( helpBuf, "%s\n", pHelp->text );
+		    smash_forwardslash( helpBuf );
+		    html_colourconv( helpBuf2, helpBuf, ch );
+		    fprintf( fp, helpBuf2 );
+		}
+
+	    fclose( fp );
+	    fp = fopen( "/home/aww/public_html/lists/help.txt","w" );
+
+		/* dump the help keywords */
+	    for ( pHelp = help_first; pHelp != NULL; pHelp = pHelp->next )
+	    {
+			fprintf( fp, "<a href=http://www.aww-mud.org/lists/" );
+			sprintf( helpBuf, "%s.html", pHelp->keyword );
+		    smash_forwardslash( helpBuf );
+		    smash_space( helpBuf );
+		    smash_tics( helpBuf );
+		    fprintf( fp, helpBuf );
+			fprintf( fp, ">" );
+			sprintf( helpBuf, "%s", pHelp->keyword );
+		    smash_forwardslash( helpBuf );
+		    smash_space( helpBuf );
+		    smash_tics( helpBuf );
+		    fprintf( fp, helpBuf );
+			fprintf( fp, "</a>\n" );
+		}
+
+	    /* close file */
+	    fclose( fp );
+	    fpReserve = fopen( NULL_FILE, "r" );
+	    return;
+	}
+

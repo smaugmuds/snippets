@@ -1,0 +1,159 @@
+From: ferris@FootPrints.net
+
+/*
+ * Externals.
+ * Add this to top of act_wiz.c
+ */
+extern  AFFECT_DATA        *affect_free;
+
+/*
+ * Add this somewhere in act_wiz.c
+ */
+void do_addapply(CHAR_DATA *ch, char *argument)
+{
+  OBJ_DATA *obj;
+  AFFECT_DATA *paf,*af_new;
+  char arg1[MAX_INPUT_LENGTH];
+  char arg2[MAX_INPUT_LENGTH];
+  char arg3[MAX_INPUT_LENGTH];
+  int affect_modify = 0, bit = 0, enchant_type, pos, i;
+
+  argument = one_argument( argument, arg1 );
+  argument = one_argument( argument, arg2 );
+  argument = one_argument( argument, arg3 );
+
+  if ( arg1[0] == '\0' || arg2[0] == '\0' || arg3[0] == '\0' )
+  {
+    send_to_char("Syntax for applies: addapply <object> <apply type> <value>\n\r",ch);
+    send_to_char("Apply Types: hp str dex int wis con sex mana\n\r", ch);
+    send_to_char("             ac move hitroll damroll saves\n\r\n\r", ch);
+    send_to_char("Syntax for affects: addapply <object> affect <affect name>\n\r",ch);
+    send_to_char("Affect Names: blind invisible detect_evil detect_invis detect_magic\n\r",ch);
+    send_to_char("              detect_hidden detect_good sanctuary faerie_fire infrared\n\r",ch);
+    send_to_char("              curse poison protect_evil protect_good sneak hide sleep charm\n\r", ch);
+    send_to_char("              flying pass_door haste calm plague weaken dark_vision berserk\n\r", ch);
+    send_to_char("              swim regeneration slow\n\r", ch);
+    send_to_char("Affects availible include the ones you add too!\n\r", ch);
+    return;
+  }
+
+  obj = get_obj_world(ch,arg1);
+
+  if (obj == NULL)
+  {
+    send_to_char("No such object exists!\n\r",ch);
+    return;
+  }
+
+       if (!str_prefix(arg2,"hp"))
+	enchant_type=APPLY_HIT;
+  else if (!str_prefix(arg2,"str"))
+	enchant_type=APPLY_STR;
+  else if (!str_prefix(arg2,"dex"))
+	enchant_type=APPLY_DEX;
+  else if (!str_prefix(arg2,"int"))
+	enchant_type=APPLY_INT;
+  else if (!str_prefix(arg2,"wis"))
+	enchant_type=APPLY_WIS;
+  else if (!str_prefix(arg2,"con"))
+	enchant_type=APPLY_CON;
+/*  else if (!str_prefix(arg2,"sex"))
+	enchant_type=APPLY_SEX;
+*/
+  else if (!str_prefix(arg2,"mana"))
+	enchant_type=APPLY_MANA;
+  else if (!str_prefix(arg2,"move"))
+	enchant_type=APPLY_MOVE;
+  else if (!str_prefix(arg2,"ac"))
+	enchant_type=APPLY_AC;
+  else if (!str_prefix(arg2,"hitroll"))
+	enchant_type=APPLY_HITROLL;
+  else if (!str_prefix(arg2,"damroll"))
+	enchant_type=APPLY_DAMROLL;
+  else if (!str_prefix(arg2,"saves"))
+	enchant_type=APPLY_SAVING_SPELL;
+  else if (!str_prefix(arg2,"affect"))
+	enchant_type=APPLY_SPELL_AFFECT;
+  else
+  {
+    send_to_char("That apply is not possible!\n\r",ch);
+    return;
+  }
+
+  if (enchant_type==APPLY_SPELL_AFFECT)
+  {
+    for (pos = 0; affect_flags[pos].name != NULL; pos++)
+	if (!str_cmp(affect_flags[pos].name,arg3))
+	    bit = affect_flags[pos].bit;
+  }
+  else
+  {
+    if ( is_number(arg3) )
+	affect_modify=atoi(arg3);	
+    else
+    {
+	send_to_char("Applies require a value.\n\r", ch);
+        return;
+    }
+  }
+
+    if (!obj->enchanted)
+    {
+      obj->enchanted = TRUE;
+
+      for (paf = obj->pIndexData->affected; paf != NULL; paf = paf->next)
+      {
+	if (affect_free == NULL)
+	af_new = alloc_perm(sizeof(*af_new));
+	else
+        {
+	  af_new = affect_free;
+	  affect_free = affect_free->next;
+        }
+
+      af_new->next = obj->affected;
+      obj->affected = af_new;
+      af_new->type        = UMAX(0,paf->type);
+      af_new->level       = paf->level;
+      af_new->duration    = paf->duration;
+      af_new->location    = paf->location;
+      af_new->modifier    = paf->modifier;
+      af_new->bitvector   = paf->bitvector;
+      }
+    }
+
+  if (affect_free == NULL)
+    paf = alloc_perm(sizeof(*paf));
+  else
+  {
+    paf = affect_free;
+    affect_free = affect_free->next;
+  }
+
+	paf->type 	= -1;
+        paf->level      = ch->level;
+        paf->duration   = -1;
+        paf->location   = enchant_type;
+	paf->modifier   = affect_modify;
+        paf->bitvector  = bit;
+
+	if (enchant_type==APPLY_SPELL_AFFECT)
+	{
+	    /* Quick hack to make table compatible with skill_lookup */
+
+	    for ( i=0 ; arg3[i] != '\0'; i++ )
+	    {
+	        if ( arg3[i] == '_' )
+	            arg3[i] = ' ';
+	    }
+
+	    paf->type 		= skill_lookup(arg3);
+	    paf->where		= TO_AFFECTS;
+	    paf->modifier	= 0;	
+	}
+
+	paf->next       = obj->affected;
+	obj->affected   = paf;
+
+	send_to_char("Ok.\n\r", ch);
+}
